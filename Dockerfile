@@ -1,68 +1,51 @@
 FROM php:8.3-apache
 
-# Install the native libraries and PHP extensions used by the application.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends \
-        curl \
-        libcurl4-openssl-dev \
-        libonig-dev \
-        libzip-dev \
-    && docker-php-ext-install -j"$(nproc)" \
-        curl \
-        mbstring \
-        opcache \
-        pdo_mysql \
-        zip \
-    && apt-get clean \
+    && apt-get install -y --no-install-recommends libonig-dev libzip-dev curl \
+    && docker-php-ext-install -j"$(nproc)" mbstring pdo_mysql zip opcache \
+    && a2enmod headers rewrite \
     && rm -rf /var/lib/apt/lists/*
 
-# Allow the application's .htaccess routing and security headers.
-RUN a2enmod headers rewrite \
-    && { \
-        echo '<VirtualHost *:80>'; \
-        echo '    ServerName localhost'; \
-        echo '    ServerAlias *'; \
-        echo '    DocumentRoot /var/www/html'; \
-        echo '    <Directory /var/www/html>'; \
-        echo '        AllowOverride All'; \
-        echo '        Options -Indexes +FollowSymLinks'; \
-        echo '        Require all granted'; \
-        echo '    </Directory>'; \
-        echo '    ErrorLog /dev/stderr'; \
-        echo '    CustomLog /dev/stdout combined'; \
-        echo '</VirtualHost>'; \
-    } > /etc/apache2/sites-available/000-default.conf
-
-# Production-oriented PHP defaults. HostForge supplies secrets at runtime.
-RUN { \
-        echo 'expose_php=Off'; \
-        echo 'display_errors=Off'; \
-        echo 'log_errors=On'; \
-        echo 'error_log=/proc/self/fd/2'; \
-        echo 'memory_limit=256M'; \
-        echo 'upload_max_filesize=64M'; \
-        echo 'post_max_size=64M'; \
-        echo 'session.cookie_httponly=1'; \
-        echo 'session.cookie_samesite=Lax'; \
-        echo 'session.use_strict_mode=1'; \
-        echo 'opcache.enable=1'; \
-        echo 'opcache.validate_timestamps=0'; \
-        echo 'opcache.memory_consumption=128'; \
-        echo 'opcache.interned_strings_buffer=16'; \
-        echo 'opcache.max_accelerated_files=20000'; \
-    } > /usr/local/etc/php/conf.d/app-production.ini
-
 WORKDIR /var/www/html
-COPY . .
+COPY . /var/www/html/
 
-RUN mkdir -p storage/logs storage/exports storage/reports \
+RUN printf '%s\n' \
+    'ServerName localhost' \
+    > /etc/apache2/conf-available/servername.conf \
+    && a2enconf servername \
+    && printf '%s\n' \
+    '<VirtualHost *:80>' \
+    '    DocumentRoot /var/www/html' \
+    '    <Directory /var/www/html>' \
+    '        AllowOverride All' \
+    '        Require all granted' \
+    '        Options -Indexes +FollowSymLinks' \
+    '    </Directory>' \
+    '    ErrorLog /dev/stderr' \
+    '    CustomLog /dev/stdout combined' \
+    '</VirtualHost>' \
+    > /etc/apache2/sites-available/000-default.conf \
+    && mkdir -p storage/logs storage/exports storage/reports \
     && chown -R www-data:www-data storage \
-    && chmod -R 0755 storage \
-    && rm -f .env
+    && chmod -R 0755 storage
+
+RUN { \
+    echo 'expose_php=Off'; \
+    echo 'display_errors=Off'; \
+    echo 'log_errors=On'; \
+    echo 'error_log=/proc/self/fd/2'; \
+    echo 'memory_limit=256M'; \
+    echo 'upload_max_filesize=64M'; \
+    echo 'post_max_size=64M'; \
+    echo 'session.cookie_httponly=1'; \
+    echo 'session.cookie_samesite=Lax'; \
+    echo 'opcache.enable=1'; \
+    echo 'opcache.validate_timestamps=0'; \
+} > /usr/local/etc/php/conf.d/app.ini
 
 EXPOSE 80
 
-HEALTHCHECK --interval=10s --timeout=3s --start-period=10s --retries=5 \
-    CMD ["curl", "-fsS", "http://127.0.0.1/health.php"]
+HEALTHCHECK --interval=10s --timeout=5s --start-period=15s --retries=6 \
+    CMD curl -fsS http://127.0.0.1/health.php || exit 1
 
 CMD ["apache2-foreground"]

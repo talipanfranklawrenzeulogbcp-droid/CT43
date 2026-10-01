@@ -19,7 +19,7 @@ function gsms_load_env_file(): void {
     if ($lines === false) return;
     foreach ($lines as $line) {
         $line = trim($line);
-        if ($line === '' || strpos($line, '#') === 0 || !strpos($line, '=') !== false) continue;
+        if ($line === '' || strpos($line, '#') === 0 || strpos($line, '=') === false) continue;
         [$name, $value] = array_map('trim', explode('=', $line, 2));
         $value = trim($value, " \"'");
         if ($name !== '' && getenv($name) === false) {

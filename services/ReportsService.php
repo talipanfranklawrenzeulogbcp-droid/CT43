@@ -2,7 +2,8 @@
 require_once __DIR__ . '/../includes/error_handler.php';
 
 final class ReportsService {
- public function __construct(private HealthSafetyService $health,private LegalComplianceService $legal,private AdminSecurityService $admin,private AssetEquipmentService $assets){}
+ private $health; private $legal; private $admin; private $assets;
+ public function __construct(HealthSafetyService $health, LegalComplianceService $legal, AdminSecurityService $admin, AssetEquipmentService $assets){$this->health=$health;$this->legal=$legal;$this->admin=$admin;$this->assets=$assets;}
  public function staffActivity(int $limit=30):array{$limit=max(1,min(100,$limit));$m=['Health, Safety & Welfare','Legal & Compliance','Asset & Equipment Issuance'];$p=implode(',',array_fill(0,count($m),'?'));$q=$this->health->pdoForReporting()->prepare("SELECT a.module,a.action,a.details,a.created_at,u.name AS staff_name,u.email FROM audit_logs a INNER JOIN users u ON u.id=a.user_id WHERE u.role='Staff' AND a.module IN ($p) ORDER BY a.created_at DESC LIMIT {$limit}");$q->execute($m);return $q->fetchAll();}
  public function staffAdminAudit(int $limit=100):array{$limit=max(1,min(200,$limit));return $this->health->pdoForReporting()->query("SELECT a.module,a.action,a.details,a.created_at,COALESCE(u.name,'System') AS name,COALESCE(u.email,'—') AS email,COALESCE(u.role,'System') AS role FROM audit_logs a LEFT JOIN users u ON u.id=a.user_id WHERE u.role IN ('Administrator','Staff') OR u.id IS NULL ORDER BY a.created_at DESC LIMIT {$limit}")->fetchAll();}
  public function staffActivityCounts():array{return $this->health->pdoForReporting()->query("SELECT a.module,COUNT(*) AS activity_count FROM audit_logs a INNER JOIN users u ON u.id=a.user_id WHERE u.role='Staff' AND a.module IN ('Health, Safety & Welfare','Legal & Compliance','Asset & Equipment Issuance') GROUP BY a.module ORDER BY a.module")->fetchAll();}

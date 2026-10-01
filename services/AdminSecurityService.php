@@ -3,7 +3,9 @@ require_once __DIR__ . '/../includes/error_handler.php';
 
 final class AdminSecurityService {
     private const MODULE='System Administration & Security';
-    public function __construct(private PDO $pdo, private AuditService $audit) {}
+    private $pdo;
+    private $audit;
+    public function __construct(PDO $pdo, AuditService $audit) { $this->pdo = $pdo; $this->audit = $audit; }
     public function users(): array { return $this->pdo->query('SELECT id,name,email,role,active,created_at FROM users ORDER BY id')->fetchAll(); }
     public function events(int $limit=20): array { return $this->audit->latestOverall($limit); }
     public function logins(int $limit=5, string $date=''): array {

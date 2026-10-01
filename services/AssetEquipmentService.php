@@ -3,7 +3,9 @@ require_once __DIR__ . '/../includes/error_handler.php';
 
 final class AssetEquipmentService {
     private const MODULE='Asset & Equipment Issuance';
-    public function __construct(private PDO $pdo, private AuditService $audit) {}
+    private $pdo;
+    private $audit;
+    public function __construct(PDO $pdo, AuditService $audit) { $this->pdo = $pdo; $this->audit = $audit; }
     public function assets(): array {
         return $this->pdo->query("SELECT a.*, CASE WHEN a.status IN ('Maintenance','Retired') THEN 0 ELSE GREATEST(a.quantity - COALESCE((SELECT COUNT(*) FROM asset_issuances i WHERE i.asset_id=a.id AND i.status IN ('Issued','Overdue','Not Returned')),0),0) END AS available_quantity FROM assets a ORDER BY a.id DESC")->fetchAll();
     }

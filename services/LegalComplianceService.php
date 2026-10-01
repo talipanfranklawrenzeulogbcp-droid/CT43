@@ -3,7 +3,9 @@ require_once __DIR__ . '/../includes/error_handler.php';
 
 final class LegalComplianceService {
     private const MODULE='Legal & Compliance';
-    public function __construct(private PDO $pdo, private AuditService $audit) {}
+    private $pdo;
+    private $audit;
+    public function __construct(PDO $pdo, AuditService $audit) { $this->pdo = $pdo; $this->audit = $audit; }
     public function obligations(): array { return $this->pdo->query('SELECT * FROM compliance_obligations ORDER BY reported_at DESC,created_at DESC,id DESC')->fetchAll(); }
     public function complianceReports(string $date='', ?int $limit=null): array {
         $where=''; $params=[]; if($date!=='' && preg_match('/^\d{4}-\d{2}-\d{2}$/',$date)){ $where=' WHERE DATE(COALESCE(reported_at,created_at))=?'; $params[]=$date; }

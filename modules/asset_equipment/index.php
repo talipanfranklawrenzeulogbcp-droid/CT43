@@ -49,12 +49,15 @@ page_header('Asset & Equipment Issuance','assets');show_flash();?>
         <?php foreach($assets as $a): 
           $avail = (int)($a['available_quantity'] ?? 0);
           $status = $a['status'] ?? 'Available';
-          $statusClass = match($status) {
-            'Available' => ($avail > 0 ? 'status-pill-success' : 'status-pill-warning'),
-            'Issued' => 'status-pill-info',
-            'Maintenance' => 'status-pill-warning',
-            default => 'status-pill-neutral'
-          };
+          if ($status === 'Available') {
+            $statusClass = $avail > 0 ? 'status-pill-success' : 'status-pill-warning';
+          } elseif ($status === 'Issued') {
+            $statusClass = 'status-pill-info';
+          } elseif ($status === 'Maintenance') {
+            $statusClass = 'status-pill-warning';
+          } else {
+            $statusClass = 'status-pill-neutral';
+          }
         ?>
         <tr>
           <td><strong><?=e($a['asset_tag'])?></strong></td>
@@ -139,7 +142,7 @@ page_header('Asset & Equipment Issuance','assets');show_flash();?>
           <td><?=e($r['employee_name'])?></td>
           <td><?=e($r['issued_date'])?></td>
           <td><?=e($r['expected_return'])?></td>
-          <td><span class="status-pill status-pill-<?=match($r['status']){'Returned'=>'success','Overdue'=>'warning','Not Returned'=>'warning',default=>'info'}?>"><?=e($r['status'])?></span></td>
+          <td><span class="status-pill status-pill-<?php $rowStatusClass = ($r['status']==='Returned' ? 'success' : (($r['status']==='Overdue' || $r['status']==='Not Returned') ? 'warning' : 'info')); ?><?=e($rowStatusClass)?>"><?=e($r['status'])?></span></td>
           <td><?=e($r['notes'])?></td>
           <td>
             <form method="post">

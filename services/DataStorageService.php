@@ -2,7 +2,8 @@
 require_once __DIR__ . '/../includes/error_handler.php';
 
 final class DataStorageService {
-    public function __construct(private PDO $pdo) {}
+    private $pdo;
+    public function __construct(PDO $pdo) { $this->pdo = $pdo; }
 
     public function items(int $limit=100): array {
         $limit=max(1,min(200,$limit));

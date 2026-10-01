@@ -38,12 +38,12 @@ set_exception_handler(static function (Throwable $e): void {
 
     $message = $e->getMessage();
     $isSetupFailure = $e instanceof PDOException
-        || str_contains($message, 'PDO MySQL')
-        || str_contains($message, 'Database connection failed');
+        || strpos($message, 'PDO MySQL') !== false
+        || strpos($message, 'Database connection failed') !== false;
     $status = $isSetupFailure ? 503 : 500;
     $accept = strtolower((string)($_SERVER['HTTP_ACCEPT'] ?? ''));
-    $isJson = str_contains($accept, 'application/json')
-        || str_starts_with((string)($_SERVER['REQUEST_URI'] ?? ''), '/services/api/');
+    $isJson = strpos($accept, 'application/json') !== false
+        || strpos((string)($_SERVER['REQUEST_URI'] ?? ''), '/services/api/') === 0;
 
     http_response_code($status);
     header('Cache-Control: no-store');

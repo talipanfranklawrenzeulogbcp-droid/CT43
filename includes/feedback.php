@@ -9,7 +9,7 @@ $action=(string)($_POST['action']??'send');
 $name=trim((string)($u['name']??'')); $role=trim((string)($u['role']??'')); $feedback=trim((string)($_POST['feedback']??''));
 $returnTo=trim((string)($_POST['return_to']??''));
 // Only accept local absolute paths. Reject protocol-relative URLs such as //evil.example.
-if($returnTo==='' || !str_starts_with($returnTo,'/') || str_starts_with($returnTo,'//')){ $returnTo='/dashboard.php'; }
+if($returnTo==='' || strpos($returnTo,'/') !== 0 || strpos($returnTo,'//') === 0){ $returnTo='/dashboard.php'; }
 
 try {
     if($action==='reply'){

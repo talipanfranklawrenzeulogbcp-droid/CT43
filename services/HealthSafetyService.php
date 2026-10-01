@@ -3,7 +3,9 @@ require_once __DIR__ . '/../includes/error_handler.php';
 
 final class HealthSafetyService {
     private const MODULE='Health, Safety & Welfare';
-    public function __construct(private PDO $pdo, private AuditService $audit) {}
+    private $pdo;
+    private $audit;
+    public function __construct(PDO $pdo, AuditService $audit) { $this->pdo = $pdo; $this->audit = $audit; }
 
     public function pdoForReporting(): PDO { return $this->pdo; }
 

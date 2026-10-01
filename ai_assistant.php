@@ -1,6 +1,4 @@
 <?php
-require_once __DIR__ . '/includes/error_handler.php';
-
 require_once __DIR__.'/includes/helpers.php';
 require_login();
 page_header('AI System Assistant','ai'); ?>

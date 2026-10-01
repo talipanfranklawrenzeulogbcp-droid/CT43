@@ -1,6 +1,4 @@
 <?php
-require_once __DIR__ . '/error_handler.php';
-
 require_once __DIR__.'/helpers.php';
 require_login();
 if($_SERVER['REQUEST_METHOD']!=='POST'){ redirect('/dashboard.php'); }
@@ -8,8 +6,7 @@ $u=current_user();
 $action=(string)($_POST['action']??'send');
 $name=trim((string)($u['name']??'')); $role=trim((string)($u['role']??'')); $feedback=trim((string)($_POST['feedback']??''));
 $returnTo=trim((string)($_POST['return_to']??''));
-// Only accept local absolute paths. Reject protocol-relative URLs such as //evil.example.
-if($returnTo==='' || strpos($returnTo,'/') !== 0 || strpos($returnTo,'//') === 0){ $returnTo='/dashboard.php'; }
+if($returnTo==='' || !str_starts_with($returnTo,'/')){ $returnTo='/dashboard.php'; }
 
 try {
     if($action==='reply'){

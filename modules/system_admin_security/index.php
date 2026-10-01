@@ -1,6 +1,4 @@
 <?php
-require_once __DIR__ . '/../../includes/error_handler.php';
-
 require_once __DIR__.'/../../includes/helpers.php';
 require_once __DIR__.'/../../includes/service_client.php';
 require_admin();
@@ -37,7 +35,7 @@ page_header('System Administration & Security','security');show_flash();?>
 
 <section class="gw-panel" id="user-accounts"><div class="gw-panel-head"><h2>User Accounts</h2><span><?=count($users)?> accounts</span></div>
 <div class="table-wrap"><table class="data-table"><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th></th></tr></thead><tbody>
-<?php foreach($users as $u):?><tr><td><?=e($u['name'])?></td><td><?=e($u['email'])?></td><td><?=e($u['role'])?></td><td><?=((int)$u['active']?'Active':'Inactive')?></td><td style="display:flex;gap:6px;align-items:center"><button type="button" class="gw-btn secondary" onclick='showEditUserModal(<?=json_encode((int)$u['id'])?>,<?=json_encode($u['name'],JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT)?>,<?=json_encode($u['email'],JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT)?>,<?=json_encode($u['role'],JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT)?>)'>Edit</button><form method="post"><input type="hidden" name="action" value="set_user_status"><input type="hidden" name="id" value="<?=$u['id']?>"><input type="hidden" name="active" value="<?=((int)$u['active']?0:1)?>"><button class="gw-btn <?=((int)$u['active']?'btn-danger':'primary')?>" <?=((int)$u['id']===(int)current_user()['id'] && (int)$u['active']===1)?'disabled title="Current signed-in account cannot be deactivated"':''?>><?=((int)$u['active']?'Deactivate':'Activate')?></button></form></td></tr><?php endforeach;?>
+<?php foreach($users as $u):?><tr><td><?=e($u['name'])?></td><td><?=e($u['email'])?></td><td><?=e($u['role'])?></td><td><?=((int)$u['active']?'Active':'Inactive')?></td><td style="display:flex;gap:6px;align-items:center"><button type="button" class="gw-btn secondary" onclick='showEditUserModal(<?=json_encode((int)$u['id'])?>,<?=json_encode($u['name'])?>,<?=json_encode($u['email'])?>,<?=json_encode($u['role'])?>)'>Edit</button><form method="post"><input type="hidden" name="action" value="set_user_status"><input type="hidden" name="id" value="<?=$u['id']?>"><input type="hidden" name="active" value="<?=((int)$u['active']?0:1)?>"><button class="gw-btn <?=((int)$u['active']?'btn-danger':'primary')?>" <?=((int)$u['id']===(int)current_user()['id'] && (int)$u['active']===1)?'disabled title="Current signed-in account cannot be deactivated"':''?>><?=((int)$u['active']?'Deactivate':'Activate')?></button></form></td></tr><?php endforeach;?>
 </tbody></table></div></section>
 
 <section class="gw-panel" id="login-history" style="margin-top:20px">

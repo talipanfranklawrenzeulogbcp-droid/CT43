@@ -1,6 +1,4 @@
 <?php
-require_once __DIR__ . '/error_handler.php';
-
 // =============================================================
 // GREAT SOLOMON MANPOWER SERVICES INC. — CORE TRANSACTION 4
 // config.php — Centralised runtime configuration.
@@ -19,7 +17,7 @@ function gsms_load_env_file(): void {
     if ($lines === false) return;
     foreach ($lines as $line) {
         $line = trim($line);
-        if ($line === '' || strpos($line, '#') === 0 || strpos($line, '=') === false) continue;
+        if ($line === '' || str_starts_with($line, '#') || !str_contains($line, '=')) continue;
         [$name, $value] = array_map('trim', explode('=', $line, 2));
         $value = trim($value, " \"'");
         if ($name !== '' && getenv($name) === false) {
@@ -104,9 +102,6 @@ define('APP_HTTPS', (
     (!empty($_SERVER['HTTP_X_FORWARDED_SSL'])     && $_SERVER['HTTP_X_FORWARDED_SSL']     === 'on') ||
     ((int)($_SERVER['SERVER_PORT'] ?? 0) === 443)
 ));
-
-// Exception handling is centralised in includes/error_handler.php so PHP,
-// database and deployment diagnostics all use the same handler.
 
 // Apply secure session cookie settings on first include.
 if (session_status() === PHP_SESSION_NONE) {

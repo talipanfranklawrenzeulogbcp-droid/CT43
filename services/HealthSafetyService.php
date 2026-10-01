@@ -1,11 +1,7 @@
 <?php
-require_once __DIR__ . '/../includes/error_handler.php';
-
 final class HealthSafetyService {
     private const MODULE='Health, Safety & Welfare';
-    private $pdo;
-    private $audit;
-    public function __construct(PDO $pdo, AuditService $audit) { $this->pdo = $pdo; $this->audit = $audit; }
+    public function __construct(private PDO $pdo, private AuditService $audit) {}
 
     public function pdoForReporting(): PDO { return $this->pdo; }
 
@@ -25,6 +21,13 @@ final class HealthSafetyService {
 }else{$i=(int)$this->pdo->query('SELECT COUNT(*) FROM safety_incidents')->fetchColumn();$o=(int)$this->pdo->query("SELECT COUNT(*) FROM safety_incidents WHERE status <> 'Closed'")->fetchColumn();$h=(int)$this->pdo->query('SELECT COUNT(*) FROM health_records')->fetchColumn();}
 return ['incidents'=>$i,'open_incidents'=>$o,'health_records'=>$h];
     }
+    public function fileRequests(string $date='', ?int $limit=null): array {
+        $where=''; $params=[];
+        if($date!=='' && preg_match('/^\d{4}-\d{2}-\d{2}$/',$date)){ $where=' WHERE request_date=?'; $params[]=$date; }
+        $lim=$limit!==null ? ' LIMIT '.max(1,min(200,$limit)) : '';
+        $q=$this->pdo->prepare("SELECT * FROM health_safety_files{$where} ORDER BY request_date DESC,id DESC{$lim}"); $q->execute($params); return $q->fetchAll();
+    }
+    public function storageFile(int $id): ?array { $q=$this->pdo->prepare('SELECT id,file_name,file_type FROM data_storage WHERE id=?'); $q->execute([$id]); return $q->fetch() ?: null; }
     private function archiveRecord(string $table, int $id, string $name, ?array $user): void {
         $stmt=$this->pdo->prepare("SELECT * FROM `$table` WHERE id=? LIMIT 1");
         $stmt->execute([$id]);
@@ -50,6 +53,47 @@ return ['incidents'=>$i,'open_incidents'=>$o,'health_records'=>$h];
             $this->archiveRecord('safety_incidents',$id,'Safety Incident #'.$id,$user);
             $this->pdo->prepare('DELETE FROM safety_incidents WHERE id=?')->execute([$id]);
             $this->audit->record($user,self::MODULE,'Delete Incident','Archived ID '.$id); return 'Incident deleted and moved to Archive.';
+        }
+        if($action==='request_file' || $action==='release_file'){
+ $employee=trim((string)($data['employee_name']??'')); $date=(string)($data['file_date']??date('Y-m-d')); $notes=trim((string)($data['file_notes']??''));
+ if($employee===''||!preg_match('/^\d{4}-\d{2}-\d{2}$/',$date)) throw new RuntimeException('Requester and valid date are required.');
+ if($action==='request_file'){
+   $file=trim((string)($data['file_name']??'')); $type=trim((string)($data['file_type']??''));
+   if($file==='') throw new RuntimeException('Requested file is required.');
+   $requesterId=(int)($user['id']??0) ?: null;
+   $q=$this->pdo->prepare('INSERT INTO health_safety_files(employee_name,requester_user_id,file_name,file_type,action_type,request_date,notes) VALUES(?,?,?,?,?,?,?)');
+   $q->execute([$employee,$requesterId,$file,$type,'Requested',$date,$notes]);
+   $this->audit->record($user,self::MODULE,'Pending File Request',$file.' — '.$employee);
+   return 'File request received and added to Pending Request Files.';
+ }
+ $storageIds=$data['storage_file_ids']??[];
+ if(!is_array($storageIds)) $storageIds=[$storageIds];
+ $storageIds=array_values(array_unique(array_filter(array_map('intval',$storageIds),fn($id)=>$id>0)));
+ if(!$storageIds) throw new RuntimeException('Choose at least one data/file from Data Storage first.');
+ $match=$this->pdo->prepare("SELECT id,requester_user_id FROM health_safety_files WHERE employee_name=? AND action_type='Requested' ORDER BY id ASC");
+ $match->execute([$employee]); $pendingRows=$match->fetchAll();
+ $requesterId=$pendingRows[0]['requester_user_id']??null;
+ $releasedNames=[];
+ $update=$this->pdo->prepare("UPDATE health_safety_files SET action_type='Released',request_date=?,file_name=?,file_type=?,storage_file_id=?,released_at=NOW(),notes=? WHERE id=?");
+ $insert=$this->pdo->prepare("INSERT INTO health_safety_files(employee_name,requester_user_id,file_name,file_type,storage_file_id,action_type,request_date,notes,released_at) VALUES(?,?,?,?,?,?,?,?,NOW())");
+ $notice=$this->pdo->prepare("INSERT INTO admin_notifications(user_id,type,title,message,sender_name,sender_role) VALUES(?,?,?,?,?,?)");
+ foreach($storageIds as $index=>$storageId){
+   $stored=$this->storageFile($storageId);
+   if(!$stored) throw new RuntimeException('One of the selected data/files is no longer available in Data Storage.');
+   $releasedNames[]=$stored['file_name'];
+   $pending=$pendingRows[$index]??null;
+   $rowRequesterId=$pending['requester_user_id']??$requesterId;
+   if($pending){
+     $update->execute([$date,$stored['file_name'],$stored['file_type'],$storageId,$notes,(int)$pending['id']]);
+   } else {
+     $insert->execute([$employee,$rowRequesterId,$stored['file_name'],$stored['file_type'],$storageId,'Released',$date,$notes]);
+   }
+   if($rowRequesterId){
+     $notice->execute([$rowRequesterId,'file_release','File Released','Your requested file has been released: '.$stored['file_name'],(string)($user['name']??'Staff'),(string)($user['role']??'Staff')]);
+   }
+ }
+ $this->audit->record($user,self::MODULE,'Release File',implode(', ',$releasedNames).' — '.$employee);
+ return 'successfully sent !';
         }
         if($action==='add_health'){
             $employee=trim((string)($data['employee_name']??'')); if($employee===''||empty($data['checkup_date'])) throw new RuntimeException('Employee and checkup date are required.');

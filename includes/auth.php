@@ -1,17 +1,18 @@
 <?php
-require_once __DIR__ . '/error_handler.php';
-
+// Load runtime/session configuration before starting the session so secure,
+// HttpOnly and SameSite cookie attributes are actually applied on first request.
 require_once __DIR__.'/config.php';
 if (session_status() !== PHP_SESSION_ACTIVE) session_start();
 
 function current_user(): ?array { return $_SESSION['user'] ?? null; }
 
 function app_base_path(): string {
-    $script = $_SERVER['SCRIPT_NAME'] ?? '/';
-    $path = str_replace('\\', '/', dirname($script));
-    $path = preg_replace('#/(?:auth|includes|services|modules)(?:/.*)?$#', '', $path) ?: '';
-    $path = rtrim($path, '/');
-    return ($path === '' || $path === '.') ? '' : $path;
+    $path=str_replace('\\','/',dirname($_SERVER['SCRIPT_NAME']??'/'));
+    if(str_contains($path,'/modules/')) return preg_replace('#/modules/.*$#','',$path) ?: '';
+    if(str_contains($path,'/auth/')) return preg_replace('#/auth/.*$#','',$path) ?: '';
+    if(str_contains($path,'/includes')) return preg_replace('#/includes.*$#','',$path) ?: '';
+    if(str_contains($path,'/services')) return preg_replace('#/services.*$#','',$path) ?: '';
+    return ($path==='/' || $path==='.') ? '' : rtrim($path,'/');
 }
 
 function require_login(): void {

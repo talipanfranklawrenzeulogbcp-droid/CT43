@@ -1,6 +1,4 @@
 <?php
-require_once __DIR__ . '/error_handler.php';
-
 require_once __DIR__.'/helpers.php';
 require_once __DIR__.'/service_client.php';
 require_login();
@@ -91,24 +89,16 @@ if($_SERVER['REQUEST_METHOD']==='POST' && $action==='delete'){
 if($_SERVER['REQUEST_METHOD']==='POST' && $action==='upload'){
     $u=current_user();
     $isAjax = (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest')
-        || (strpos($_SERVER['HTTP_ACCEPT'] ?? '', 'application/json') !== false);
+        || (str_contains($_SERVER['HTTP_ACCEPT'] ?? '', 'application/json'));
     try{
         if(empty($_FILES['data_file']) || $_FILES['data_file']['error']!==UPLOAD_ERR_OK){
             $errCode = (int)($_FILES['data_file']['error'] ?? UPLOAD_ERR_NO_FILE);
-            switch ($errCode) {
-                case UPLOAD_ERR_INI_SIZE:
-                case UPLOAD_ERR_FORM_SIZE:
-                    $msg = 'File size exceeds maximum upload limit.';
-                    break;
-                case UPLOAD_ERR_PARTIAL:
-                    $msg = 'File was only partially uploaded.';
-                    break;
-                case UPLOAD_ERR_NO_FILE:
-                    $msg = 'Please select a file to upload.';
-                    break;
-                default:
-                    $msg = 'File upload failed. Please try again.';
-            }
+            $msg = match($errCode) {
+                UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE => 'File size exceeds maximum upload limit.',
+                UPLOAD_ERR_PARTIAL => 'File was only partially uploaded.',
+                UPLOAD_ERR_NO_FILE => 'Please select a file to upload.',
+                default => 'File upload failed. Please try again.'
+            };
             throw new RuntimeException($msg);
         }
         if((int)$_FILES['data_file']['size']>10*1024*1024) throw new RuntimeException('File size must not exceed 10 MB.');
@@ -157,7 +147,7 @@ if($_SERVER['REQUEST_METHOD']==='POST' && $action==='upload'){
         flash('error','Unable to store file: '.$e->getMessage());
     }
     $returnTo = trim((string)($_POST['return_to'] ?? ''));
-    if ($returnTo === '' || strpos($returnTo, '/') !== 0) {
+    if ($returnTo === '' || !str_starts_with($returnTo, '/')) {
         $returnTo = '/dashboard.php';
     }
     redirect($returnTo);

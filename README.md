@@ -15,9 +15,6 @@ This package is a database-backed PHP application for Core Transaction 4.
 - `style.css` — CSS
 
 
-## HTTP 500 / server requirements
-The application requires **PHP 8.0+** with the `pdo_mysql`, `openssl`, and `curl` extensions enabled, plus MySQL/MariaDB. If the server reports HTTP 500, open `health.php` first: it now reports whether PHP, PDO MySQL, and the database connection are available. Verify the `GSMS_DB_*` environment variables or the values in `includes/config.php`, then restart PHP/Apache after enabling extensions.
-
 ## Install
 1. Put the project in Apache/XAMPP `htdocs`.
 2. Import `database/database.sql` into MySQL/phpMyAdmin.
@@ -51,7 +48,8 @@ The login now uses password + a 6-digit OTP before opening the dashboard.
 - Administrator name: `Admin`
 - Administrator password: `ISMERSCT4`
 
-For production, set the Gmail App Password through the server environment variables `GSMS_MAIL_USERNAME` and `GSMS_MAIL_PASSWORD`.
+For production, move the Gmail App Password from `includes/config.php` to environment variables:
+`GSMS_MAIL_USERNAME` and `GSMS_MAIL_PASSWORD`.
 
 
 ---
@@ -79,9 +77,9 @@ For security, passwords/password hashes, OTPs, SMTP credentials, API keys, sessi
 ### Server environment
 Set these variables on the PHP server (not in JavaScript or a public file):
 - `GEMINI_API_KEY` — your Gemini API key
-- `GEMINI_MODEL` — defaults to `gemini-3.8-flash`
+- `GEMINI_MODEL` — defaults to `gemini-2.0-flash`
 
-See `.env.example` for the names only. The package does not include a live `.env` file or API key. Copy `.env.example` to `.env` for local development, fill in your own secrets, and never commit `.env`.
+See `.env.example` for the names only. For the supplied local build, the Gemini key is stored in the server-only `.env` file and is never sent to browser JavaScript. Rotate the supplied key after testing because it was shared during setup.
 
 
 ## CT4 Authentication and Gmail OTP
@@ -91,17 +89,7 @@ The database seed provisions the main administrator as:
 - Email: `adminct4@gmail.com`
 - Role: `Administrator`
 
-Import `database/database.sql` into MySQL before first use. For an existing CT4 database, run `database/migrate_existing.sql` once before deploying this version; runtime page requests no longer execute schema `ALTER TABLE` operations. PHP must have OpenSSL and cURL enabled. If SMTP is blocked by the hosting provider, allow outbound SMTP/TLS traffic on port 587.
+Import `database/database.sql` into MySQL before first use. PHP must have OpenSSL and cURL enabled. If SMTP is blocked by the hosting provider, allow outbound SMTP/TLS traffic on port 587.
 
 ## Role-based access
 Staff accounts can access Reports, Analysis & Dashboard, AI System Assistant, Health, Safety & Welfare, Legal & Compliance, and Asset & Equipment Issuance. System Administration & Security is administrator-only. Administrator dashboards include staff activity tracking for the Health, Safety & Welfare, Legal & Compliance, and Asset & Equipment Issuance modules through audit records.
-
-
-## HTTP 500 diagnostics and logging
-
-- Uncaught exceptions, PHP warnings/notices, and fatal shutdown errors are logged to `storage/logs/php-error.log` (the directory is created automatically when permissions allow).
-- Visitors receive the generic `500.php` error page with a reference ID; technical details are not shown publicly.
-- Apache is configured with `ErrorDocument 500 /500.php`. The app-level handler also renders the page for uncaught PHP exceptions and fatal errors when headers have not already been sent.
-- Ensure the PHP/Apache user can write to `storage/` (recommended directory permissions: `0750`, adjusted to your hosting user/group). Keep `storage/` inaccessible from the web; the included `.htaccess` denies it.
-- Review `storage/logs/php-error.log` on the server to diagnose the exact failure. Do not expose this log publicly or share it without removing credentials, tokens, and personal data.
-- `health.php` is an operational diagnostic endpoint and may reveal dependency status; restrict it to administrators or disable it on public production deployments if that information is sensitive.

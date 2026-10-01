@@ -1,6 +1,5 @@
 <?php
 require_once __DIR__ . '/../includes/error_handler.php';
-
 require_once __DIR__.'/../includes/helpers.php';
 require_once __DIR__.'/../includes/mailer.php';
 
@@ -57,17 +56,27 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
                         $error='Incorrect verification code.';
                     } else {
                         login_user($pending);
-                        db()->prepare('DELETE FROM otp_requests WHERE user_id=?')->execute([(int)$pending['id']]);
-                        unset($_SESSION['pending_otp_user'],$_SESSION['pending_otp_created'],$_SESSION['csrf_token']);
-
-                        $history=db()->prepare('INSERT INTO login_history(user_id,email,status,ip_address,user_agent) VALUES(?,?,?,?,?)');
-                        $history->execute([
-                            (int)$pending['id'],$pending['email'],'Success',
-                            $_SERVER['REMOTE_ADDR']??'Unknown',
-                            substr($_SERVER['HTTP_USER_AGENT']??'',0,500)
-                        ]);
-                        audit('System Administration & Security','Two-Step Login','Successful password and OTP verification');
-                        redirect('/dashboard.php');
+                        
+                        // Batch cleanup operations in a transaction
+                        try {
+                            $pdo = db();
+                            $pdo->beginTransaction();
+                            $pdo->prepare('DELETE FROM otp_requests WHERE user_id=?')->execute([(int)$pending['id']]);
+                            $pdo->prepare('INSERT INTO login_history(user_id,email,status,ip_address,user_agent) VALUES(?,?,?,?,?)')->execute([
+                                (int)$pending['id'],$pending['email'],'Success',
+                                $_SERVER['REMOTE_ADDR']??'Unknown',
+                                substr($_SERVER['HTTP_USER_AGENT']??'',0,500)
+                            ]);
+                            $pdo->commit();
+                            
+                            unset($_SESSION['pending_otp_user'],$_SESSION['pending_otp_created'],$_SESSION['csrf_token']);
+                            // Queue audit log asynchronously (background job)
+                            queue_audit_log('System Administration & Security','Two-Step Login','Successful password and OTP verification', (int)$pending['id']);
+                            redirect('/dashboard.php');
+                        } catch(Throwable $txnError) {
+                            error_log('OTP Verification Transaction Error: ' . $txnError->getMessage());
+                            $error='Login verified but session setup failed. Please try again.';
+                        }
                     }
                 }
             } elseif ($action==='resend_otp' && $pending) {
@@ -80,20 +89,24 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
                     $hash=password_hash($otp,PASSWORD_DEFAULT);
                     $expires=date('Y-m-d H:i:s',time()+(OTP_EXPIRY_MINUTES*60));
                     
-                    db()->prepare('DELETE FROM otp_requests WHERE user_id=?')->execute([(int)$pending['id']]);
-                    db()->prepare('INSERT INTO otp_requests(user_id,otp_hash,expires_at,attempts) VALUES(?,?,?,0)')
-                        ->execute([(int)$pending['id'],$hash,$expires]);
-                    
-                    $_SESSION['pending_otp_created'] = time();
-                    $_SESSION['last_otp_resend'] = time();
-                    
+                    // Batch OTP update
                     try {
-                        send_otp_email($pending['email'],$pending['name'],$otp);
+                        $pdo = db();
+                        $pdo->beginTransaction();
+                        $pdo->prepare('DELETE FROM otp_requests WHERE user_id=?')->execute([(int)$pending['id']]);
+                        $pdo->prepare('INSERT INTO otp_requests(user_id,otp_hash,expires_at,attempts) VALUES(?,?,?,0)')
+                            ->execute([(int)$pending['id'],$hash,$expires]);
+                        $pdo->commit();
+                        
+                        $_SESSION['pending_otp_created'] = time();
+                        $_SESSION['last_otp_resend'] = time();
+                        
+                        // Queue email asynchronously instead of blocking
+                        queue_otp_email($pending['email'],$pending['name'],$otp);
                         $success='A new 6-digit verification code has been sent to your email.';
-                    } catch(Throwable $mailError) {
-                        db()->prepare('DELETE FROM otp_requests WHERE user_id=?')->execute([(int)$pending['id']]);
-                        $error='Unable to send verification code. Check the Gmail SMTP/App Password settings and try again.';
-                        error_log('OTP Email Error (Resend): ' . $mailError->getMessage());
+                    } catch(Throwable $e) {
+                        error_log('OTP Resend Transaction Error: ' . $e->getMessage());
+                        $error='Unable to prepare verification code. Please try again.';
                     }
                 }
             } elseif ($action==='login') {
@@ -109,17 +122,27 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
                     $u=$stmt->fetch();
 
                     if ($u && password_verify($password,$u['password_hash'])) {
-                        db()->prepare('DELETE FROM otp_requests WHERE user_id=?')->execute([(int)$u['id']]);
-
-                        $otp=(string)random_int(100000,999999);
-                        $otpHash=password_hash($otp,PASSWORD_DEFAULT);
-                        $expires=date('Y-m-d H:i:s',time()+(OTP_EXPIRY_MINUTES*60));
-
-                        db()->prepare('INSERT INTO otp_requests(user_id,otp_hash,expires_at,attempts) VALUES(?,?,?,0)')
-                            ->execute([(int)$u['id'],$otpHash,$expires]);
-
+                        // Batch OTP insert
                         try {
-                            send_otp_email($u['email'],$u['name'],$otp);
+                            $pdo = db();
+                            $pdo->beginTransaction();
+                            $pdo->prepare('DELETE FROM otp_requests WHERE user_id=?')->execute([(int)$u['id']]);
+                            
+                            $otp=(string)random_int(100000,999999);
+                            $otpHash=password_hash($otp,PASSWORD_DEFAULT);
+                            $expires=date('Y-m-d H:i:s',time()+(OTP_EXPIRY_MINUTES*60));
+                            
+                            $pdo->prepare('INSERT INTO otp_requests(user_id,otp_hash,expires_at,attempts) VALUES(?,?,?,0)')
+                                ->execute([(int)$u['id'],$otpHash,$expires]);
+                            
+                            $pdo->prepare('INSERT INTO login_history(user_id,email,status,ip_address,user_agent) VALUES(?,?,?,?,?)')
+                                ->execute([(int)$u['id'],$email,'OTP Pending',
+                                    $_SERVER['REMOTE_ADDR']??'Unknown',
+                                    substr($_SERVER['HTTP_USER_AGENT']??'',0,500)
+                                ]);
+                            
+                            $pdo->commit();
+                            
                             $_SESSION['pending_otp_user']=[
                                 'id'=>(int)$u['id'],'name'=>$u['name'],
                                 'email'=>$u['email'],'role'=>$u['role']
@@ -128,27 +151,18 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
                             $_SESSION['last_otp_resend']=time();
                             $pending=$_SESSION['pending_otp_user'];
                             $success='Verification code sent. Enter the 6-digit OTP below to continue to the dashboard.';
-
-                            $history=db()->prepare('INSERT INTO login_history(user_id,email,status,ip_address,user_agent) VALUES(?,?,?,?,?)');
-                            $history->execute([
-                                (int)$u['id'],$email,'OTP Pending',
-                                $_SERVER['REMOTE_ADDR']??'Unknown',
-                                substr($_SERVER['HTTP_USER_AGENT']??'',0,500)
-                            ]);
-                        } catch(Throwable $mailError) {
-                            db()->prepare('DELETE FROM otp_requests WHERE user_id=?')->execute([(int)$u['id']]);
-                            $error='We could not send the verification code. Check the Gmail SMTP/App Password settings and try again.';
-                            error_log('OTP Email Error (Login): ' . $mailError->getMessage());
+                            
+                            // Queue email asynchronously (non-blocking)
+                            queue_otp_email($u['email'],$u['name'],$otp);
+                        } catch(Throwable $txnError) {
+                            error_log('OTP Login Transaction Error: ' . $txnError->getMessage());
+                            $error='Unable to prepare verification. Please try again.';
                         }
                     } else {
                         // Generic error to prevent username enumeration
                         $error='Invalid email or password.';
-                        $history=db()->prepare('INSERT INTO login_history(user_id,email,status,ip_address,user_agent) VALUES(?,?,?,?,?)');
-                        $history->execute([
-                            $u ? (int)$u['id'] : null,$email,'Failed',
-                            $_SERVER['REMOTE_ADDR']??'Unknown',
-                            substr($_SERVER['HTTP_USER_AGENT']??'',0,500)
-                        ]);
+                        // Queue failed login asynchronously to avoid blocking
+                        queue_login_history($u ? (int)$u['id'] : null, $email, 'Failed');
                     }
                 }
             }

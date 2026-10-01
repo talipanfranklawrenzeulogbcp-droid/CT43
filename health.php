@@ -2,8 +2,11 @@
 declare(strict_types=1);
 
 /**
- * Deployment/runtime health endpoint.
- * Does not expose credentials or database details.
+ * Deployment liveness endpoint.
+ *
+ * HostForge verifies that the container is serving HTTP by requesting this
+ * file. Therefore this endpoint must not depend on MySQL or optional PHP
+ * extensions. Dependency state is returned for diagnostics only.
  */
 header('Content-Type: application/json; charset=UTF-8');
 header('Cache-Control: no-cache, no-store, must-revalidate');
@@ -17,26 +20,29 @@ $checks = [
     'openssl' => extension_loaded('openssl'),
 ];
 
-$ok = !in_array(false, $checks, true);
 $dbOk = false;
-
 try {
-    require_once __DIR__.'/includes/db.php';
-    db()->query('SELECT 1');
-    $dbOk = true;
+    if ($checks['pdo'] && $checks['pdo_mysql']) {
+        require_once __DIR__.'/includes/db.php';
+        db()->query('SELECT 1');
+        $dbOk = true;
+    }
 } catch (Throwable $e) {
-    // Never return connection details to the public health endpoint.
+    // Never expose connection details and never fail the HTTP liveness probe.
     $dbOk = false;
 }
 
 $checks['database'] = $dbOk;
-$ok = $ok && $dbOk;
 
-http_response_code($ok ? 200 : 503);
+// HTTP 200 means Apache + PHP are alive and able to execute this endpoint.
+// Optional dependencies are reported above without blocking deployment.
+http_response_code(200);
 
 echo json_encode([
-    'status' => $ok ? 'ok' : 'degraded',
+    'status' => ($dbOk && $checks['pdo_mysql'] && $checks['curl'] && $checks['mbstring'] && $checks['openssl'])
+        ? 'ok'
+        : 'degraded',
     'app' => 'Great Solomon Manpower Services Inc. Core Transaction 4',
     'checks' => $checks,
     'timestamp' => date('c'),
-], JSON_UNESCAPED_SLASHES);
+], JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);

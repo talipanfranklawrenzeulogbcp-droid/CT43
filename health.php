@@ -34,3 +34,4 @@ echo json_encode([
     'checks' => $checks,
     'timestamp' => date('c'),
 ], JSON_UNESCAPED_SLASHES);
+?>

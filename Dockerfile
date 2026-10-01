@@ -5,15 +5,11 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         curl \
         libcurl4-openssl-dev \
-        libfreetype6-dev \
-        libjpeg62-turbo-dev \
         libonig-dev \
         libpng-dev \
         libzip-dev \
-    && docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-install -j"$(nproc)" \
         curl \
-        gd \
         mbstring \
         opcache \
         pdo_mysql \
@@ -65,7 +61,7 @@ RUN mkdir -p storage/logs storage/exports storage/reports \
 
 EXPOSE 80
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+HEALTHCHECK --interval=10s --timeout=3s --start-period=10s --retries=5 \
     CMD ["curl", "-fsS", "http://127.0.0.1/health.php"]
 
 CMD ["apache2-foreground"]

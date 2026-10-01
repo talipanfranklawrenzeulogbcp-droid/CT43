@@ -15,6 +15,9 @@ This package is a database-backed PHP application for Core Transaction 4.
 - `style.css` — CSS
 
 
+## HTTP 500 / server requirements
+The application requires **PHP 8.0+** with the `pdo_mysql`, `openssl`, and `curl` extensions enabled, plus MySQL/MariaDB. If the server reports HTTP 500, open `health.php` first: it now reports whether PHP, PDO MySQL, and the database connection are available. Verify the `GSMS_DB_*` environment variables or the values in `includes/config.php`, then restart PHP/Apache after enabling extensions.
+
 ## Install
 1. Put the project in Apache/XAMPP `htdocs`.
 2. Import `database/database.sql` into MySQL/phpMyAdmin.

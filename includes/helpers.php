@@ -7,7 +7,7 @@ function show_flash(): void { if (!empty($_SESSION['flash'])) { $f=$_SESSION['fl
 function audit(string $module,string $action,string $details=''): void { try { $u=current_user(); $stmt=db()->prepare('INSERT INTO audit_logs(user_id,module,action,details) VALUES(?,?,?,?)'); $stmt->execute([(int)($u['id']??0),$module,$action,$details]); } catch(Throwable $e) {} }
 function base_url(): string { $path=str_replace('\\','/',dirname($_SERVER['SCRIPT_NAME']??'/')); if(str_contains($path,'/modules/')) return preg_replace('#/modules/.*$#','',$path) ?: ''; if(str_contains($path,'/auth/')) return preg_replace('#/auth/.*$#','',$path) ?: ''; if(str_contains($path,'/includes')) return preg_replace('#/includes.*$#','',$path) ?: ''; if(str_contains($path,'/services')) return preg_replace('#/services.*$#','',$path) ?: ''; return ($path==='/' || $path==='.') ? '' : rtrim($path,'/'); }
 function url(string $path): string { return rtrim(base_url(),'/').'/'.ltrim($path,'/'); }
-function redirect(string $path): never { header('Location: '.url($path)); exit; }
+function redirect(string $path): void { header('Location: '.url($path)); exit; }
 function admin_feedback_notifications(): array {
     try {
         $stmt=db()->query("SELECT id, type, sender_name, sender_role, sender_user_id, title, message, is_read, created_at FROM admin_notifications WHERE type IN ('feedback','data_transfer') ORDER BY created_at DESC LIMIT 50");

@@ -3,6 +3,7 @@ FROM php:8.3-apache
 # Install the native libraries and PHP extensions used by the application.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
+        curl \
         libcurl4-openssl-dev \
         libfreetype6-dev \
         libjpeg62-turbo-dev \
@@ -65,6 +66,6 @@ RUN mkdir -p storage/logs storage/exports storage/reports \
 EXPOSE 80
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
-    CMD curl -fsS http://127.0.0.1/health.php > /dev/null
+    CMD ["curl", "-fsS", "http://127.0.0.1/health.php"]
 
 CMD ["apache2-foreground"]

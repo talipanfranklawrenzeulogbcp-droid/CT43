@@ -137,7 +137,12 @@ set_exception_handler(function (Throwable $e): void {
         ENT_QUOTES,
         'UTF-8'
     );
-    echo '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>CT4 Server Setup</title><style>body{font-family:Arial,sans-serif;background:#f8fafc;color:#172033;margin:0;padding:40px}.card{max-width:760px;margin:auto;background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:28px;box-shadow:0 8px 30px rgba(15,23,42,.08)}h1{margin-top:0}code{background:#f1f5f9;padding:2px 5px;border-radius:4px}a{color:#4f46e5}</style></head><body><div class="card"><h1>Core Transaction 4 — Server Setup</h1><p>'.$safe.'</p><p>Open <a href="'.htmlspecialchars(app_base_path(),ENT_QUOTES,'UTF-8').'/health.php">health.php</a> for the server readiness check.</p></div></body></html>';
+    // This handler runs during bootstrap, before helpers/auth may be loaded.
+    // Never call app_base_path() here unless it is already defined, otherwise
+    // the diagnostic page can trigger a second fatal error and hide the cause.
+    $basePath = function_exists('app_base_path') ? app_base_path() : '';
+    $healthUrl = rtrim($basePath, '/') . '/health.php';
+    echo '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>CT4 Server Setup</title><style>body{font-family:Arial,sans-serif;background:#f8fafc;color:#172033;margin:0;padding:40px}.card{max-width:760px;margin:auto;background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:28px;box-shadow:0 8px 30px rgba(15,23,42,.08)}h1{margin-top:0}code{background:#f1f5f9;padding:2px 5px;border-radius:4px}a{color:#4f46e5}</style></head><body><div class="card"><h1>Core Transaction 4 — Server Setup</h1><p>'.$safe.'</p><p>Open <a href="'.htmlspecialchars($healthUrl,ENT_QUOTES,'UTF-8').'">health.php</a> for the server readiness check.</p></div></body></html>';
 });
 
 // Apply secure session cookie settings on first include.

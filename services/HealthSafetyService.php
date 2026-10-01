@@ -1,4 +1,6 @@
 <?php
+require_once __DIR__ . '/../includes/error_handler.php';
+
 final class HealthSafetyService {
     private const MODULE='Health, Safety & Welfare';
     public function __construct(private PDO $pdo, private AuditService $audit) {}

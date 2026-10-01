@@ -1,4 +1,6 @@
 <?php
+require_once __DIR__ . '/error_handler.php';
+
 require_once __DIR__.'/helpers.php';
 require_login();
 $action=(string)($_POST['action'] ?? $_GET['action'] ?? 'list');

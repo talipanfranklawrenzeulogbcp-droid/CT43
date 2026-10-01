@@ -95,3 +95,13 @@ Import `database/database.sql` into MySQL before first use. PHP must have OpenSS
 
 ## Role-based access
 Staff accounts can access Reports, Analysis & Dashboard, AI System Assistant, Health, Safety & Welfare, Legal & Compliance, and Asset & Equipment Issuance. System Administration & Security is administrator-only. Administrator dashboards include staff activity tracking for the Health, Safety & Welfare, Legal & Compliance, and Asset & Equipment Issuance modules through audit records.
+
+
+## HTTP 500 diagnostics and logging
+
+- Uncaught exceptions, PHP warnings/notices, and fatal shutdown errors are logged to `storage/logs/php-error.log` (the directory is created automatically when permissions allow).
+- Visitors receive the generic `500.php` error page with a reference ID; technical details are not shown publicly.
+- Apache is configured with `ErrorDocument 500 /500.php`. The app-level handler also renders the page for uncaught PHP exceptions and fatal errors when headers have not already been sent.
+- Ensure the PHP/Apache user can write to `storage/` (recommended directory permissions: `0750`, adjusted to your hosting user/group). Keep `storage/` inaccessible from the web; the included `.htaccess` denies it.
+- Review `storage/logs/php-error.log` on the server to diagnose the exact failure. Do not expose this log publicly or share it without removing credentials, tokens, and personal data.
+- `health.php` is an operational diagnostic endpoint and may reveal dependency status; restrict it to administrators or disable it on public production deployments if that information is sensitive.

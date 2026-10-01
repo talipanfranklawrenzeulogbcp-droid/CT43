@@ -1,4 +1,6 @@
 <?php
+require_once __DIR__ . '/../includes/error_handler.php';
+
 final class AuditService {
     public function __construct(private PDO $pdo) {}
 

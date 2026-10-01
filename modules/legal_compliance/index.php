@@ -1,4 +1,6 @@
 <?php
+require_once __DIR__ . '/../../includes/error_handler.php';
+
 require_once __DIR__.'/../../includes/helpers.php';
 require_once __DIR__.'/../../includes/service_client.php';
 require_login();

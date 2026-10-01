@@ -1,4 +1,6 @@
 <?php
+require_once __DIR__ . '/includes/error_handler.php';
+
 require_once __DIR__.'/includes/auth.php';
 $base=rtrim(app_base_path(),'/');
 if(current_user()){

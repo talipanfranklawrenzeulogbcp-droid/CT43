@@ -1,4 +1,6 @@
 <?php
+require_once __DIR__ . '/../includes/error_handler.php';
+
 final class ReportsService {
  public function __construct(private HealthSafetyService $health,private LegalComplianceService $legal,private AdminSecurityService $admin,private AssetEquipmentService $assets){}
  public function staffActivity(int $limit=30):array{$limit=max(1,min(100,$limit));$m=['Health, Safety & Welfare','Legal & Compliance','Asset & Equipment Issuance'];$p=implode(',',array_fill(0,count($m),'?'));$q=$this->health->pdoForReporting()->prepare("SELECT a.module,a.action,a.details,a.created_at,u.name AS staff_name,u.email FROM audit_logs a INNER JOIN users u ON u.id=a.user_id WHERE u.role='Staff' AND a.module IN ($p) ORDER BY a.created_at DESC LIMIT {$limit}");$q->execute($m);return $q->fetchAll();}

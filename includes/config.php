@@ -1,4 +1,6 @@
 <?php
+require_once __DIR__ . '/error_handler.php';
+
 // =============================================================
 // GREAT SOLOMON MANPOWER SERVICES INC. — CORE TRANSACTION 4
 // config.php — Centralised runtime configuration.

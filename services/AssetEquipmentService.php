@@ -1,4 +1,6 @@
 <?php
+require_once __DIR__ . '/../includes/error_handler.php';
+
 final class AssetEquipmentService {
     private const MODULE='Asset & Equipment Issuance';
     public function __construct(private PDO $pdo, private AuditService $audit) {}

@@ -1,4 +1,6 @@
 <?php
+require_once __DIR__ . '/error_handler.php';
+
 require_once __DIR__.'/db.php';
 require_once __DIR__.'/auth.php';
 function e($v): string { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'); }

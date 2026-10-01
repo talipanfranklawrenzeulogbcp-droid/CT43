@@ -1,6 +1,8 @@
 <?php
 declare(strict_types=1);
 
+
+require_once __DIR__ . '/includes/error_handler.php';
 header('Content-Type: application/json; charset=UTF-8');
 header('Cache-Control: no-cache, no-store, must-revalidate');
 
@@ -34,4 +36,3 @@ echo json_encode([
     'checks' => $checks,
     'timestamp' => date('c'),
 ], JSON_UNESCAPED_SLASHES);
-?>

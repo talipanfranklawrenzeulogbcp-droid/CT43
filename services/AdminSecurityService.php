@@ -1,4 +1,6 @@
 <?php
+require_once __DIR__ . '/../includes/error_handler.php';
+
 final class AdminSecurityService {
     private const MODULE='System Administration & Security';
     public function __construct(private PDO $pdo, private AuditService $audit) {}

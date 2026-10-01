@@ -70,8 +70,8 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
                             $pdo->commit();
                             
                             unset($_SESSION['pending_otp_user'],$_SESSION['pending_otp_created'],$_SESSION['csrf_token']);
-                            // Queue audit log asynchronously (background job)
-                            queue_audit_log('System Administration & Security','Two-Step Login','Successful password and OTP verification', (int)$pending['id']);
+                            // Record audit log synchronously (no queuing function needed)
+                            audit('System Administration & Security','Two-Step Login','Successful password and OTP verification');
                             redirect('/dashboard.php');
                         } catch(Throwable $txnError) {
                             error_log('OTP Verification Transaction Error: ' . $txnError->getMessage());
@@ -101,9 +101,14 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
                         $_SESSION['pending_otp_created'] = time();
                         $_SESSION['last_otp_resend'] = time();
                         
-                        // Queue email asynchronously instead of blocking
-                        queue_otp_email($pending['email'],$pending['name'],$otp);
-                        $success='A new 6-digit verification code has been sent to your email.';
+                        // Send email directly instead of queuing
+                        try {
+                            send_otp_email($pending['email'],$pending['name'],$otp);
+                            $success='A new 6-digit verification code has been sent to your email.';
+                        } catch(Throwable $mailError) {
+                            error_log('OTP email send failed: ' . $mailError->getMessage());
+                            $error='Unable to send verification code. Check Gmail SMTP settings and try again.';
+                        }
                     } catch(Throwable $e) {
                         error_log('OTP Resend Transaction Error: ' . $e->getMessage());
                         $error='Unable to prepare verification code. Please try again.';
@@ -152,8 +157,13 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
                             $pending=$_SESSION['pending_otp_user'];
                             $success='Verification code sent. Enter the 6-digit OTP below to continue to the dashboard.';
                             
-                            // Queue email asynchronously (non-blocking)
-                            queue_otp_email($u['email'],$u['name'],$otp);
+                            // Send email directly instead of queuing
+                            try {
+                                send_otp_email($u['email'],$u['name'],$otp);
+                            } catch(Throwable $mailError) {
+                                error_log('OTP email send failed: ' . $mailError->getMessage());
+                                // Don't fail the login process if email fails
+                            }
                         } catch(Throwable $txnError) {
                             error_log('OTP Login Transaction Error: ' . $txnError->getMessage());
                             $error='Unable to prepare verification. Please try again.';
@@ -161,8 +171,16 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
                     } else {
                         // Generic error to prevent username enumeration
                         $error='Invalid email or password.';
-                        // Queue failed login asynchronously to avoid blocking
-                        queue_login_history($u ? (int)$u['id'] : null, $email, 'Failed');
+                        // Log failed login attempt asynchronously (record directly)
+                        try {
+                            db()->prepare('INSERT INTO login_history(user_id,email,status,ip_address,user_agent) VALUES(?,?,?,?,?)')
+                                ->execute([$u ? (int)$u['id'] : null, $email, 'Failed',
+                                    $_SERVER['REMOTE_ADDR']??'Unknown',
+                                    substr($_SERVER['HTTP_USER_AGENT']??'',0,500)
+                                ]);
+                        } catch (Throwable $e) {
+                            error_log('Failed login history write: ' . $e->getMessage());
+                        }
                     }
                 }
             }
@@ -201,7 +219,7 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
 
       <form method="post" class="auth-form">
         <input type="hidden" name="action" value="verify_otp">
-        <input type="hidden" name="csrf_token" value="<?=e(csrf_token())?>">
+        <input type="hidden" name="csrf_token" value="<?=e(csrf_token())?">
         <div class="field otp-field">
           <label for="otp">One-Time Password</label>
           <input id="otp" class="otp-input" type="text" name="otp" inputmode="numeric"
@@ -215,7 +233,7 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
 
       <form method="post" class="resend-form">
         <input type="hidden" name="action" value="resend_otp">
-        <input type="hidden" name="csrf_token" value="<?=e(csrf_token())?>">
+        <input type="hidden" name="csrf_token" value="<?=e(csrf_token())?">
         <button type="submit" class="auth-link">Resend verification code</button>
       </form>
       <a class="auth-link secondary" href="../auth/logout.php">Use a different account</a>
@@ -235,7 +253,7 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
 
       <form method="post" class="auth-form">
         <input type="hidden" name="action" value="login">
-        <input type="hidden" name="csrf_token" value="<?=e(csrf_token())?>">
+        <input type="hidden" name="csrf_token" value="<?=e(csrf_token())?">
         <div class="field"><label>Email Address</label><input type="email" name="email" autocomplete="username" required value="<?=e($_POST['email']??'')?>"></div>
         <div class="field"><label>Password</label><input type="password" name="password" autocomplete="current-password" required></div>
         <button class="gw-btn primary auth-submit" type="submit">

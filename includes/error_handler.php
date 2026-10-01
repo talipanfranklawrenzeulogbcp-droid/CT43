@@ -32,16 +32,39 @@ set_error_handler(static function (int $severity, string $message, string $file,
 
 set_exception_handler(static function (Throwable $e): void {
     $id = ct4_log_exception($e, 'uncaught-exception');
-    if (!headers_sent()) {
-        http_response_code(500);
-        header('Content-Type: text/html; charset=UTF-8');
-        header('Cache-Control: no-store');
-        if (is_file(dirname(__DIR__) . '/500.php')) {
-            define('CT4_ERROR_ID', $id);
-            require dirname(__DIR__) . '/500.php';
-        } else {
-            echo 'Internal Server Error. Reference: ' . htmlspecialchars($id, ENT_QUOTES, 'UTF-8');
-        }
+    if (headers_sent()) {
+        return;
+    }
+
+    $message = $e->getMessage();
+    $isSetupFailure = $e instanceof PDOException
+        || str_contains($message, 'PDO MySQL')
+        || str_contains($message, 'Database connection failed');
+    $status = $isSetupFailure ? 503 : 500;
+    $accept = strtolower((string)($_SERVER['HTTP_ACCEPT'] ?? ''));
+    $isJson = str_contains($accept, 'application/json')
+        || str_starts_with((string)($_SERVER['REQUEST_URI'] ?? ''), '/services/api/');
+
+    http_response_code($status);
+    header('Cache-Control: no-store');
+    if ($isJson) {
+        header('Content-Type: application/json; charset=UTF-8');
+        echo json_encode([
+            'ok' => false,
+            'error' => $isSetupFailure
+                ? $message
+                : 'The server could not complete the request.',
+            'reference' => $id,
+        ], JSON_UNESCAPED_SLASHES);
+        return;
+    }
+
+    header('Content-Type: text/html; charset=UTF-8');
+    if (is_file(dirname(__DIR__) . '/500.php')) {
+        if (!defined('CT4_ERROR_ID')) define('CT4_ERROR_ID', $id);
+        require dirname(__DIR__) . '/500.php';
+    } else {
+        echo 'Internal Server Error. Reference: ' . htmlspecialchars($id, ENT_QUOTES, 'UTF-8');
     }
 });
 

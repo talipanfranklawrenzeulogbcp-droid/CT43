@@ -91,7 +91,7 @@ The database seed provisions the main administrator as:
 - Email: `adminct4@gmail.com`
 - Role: `Administrator`
 
-Import `database/database.sql` into MySQL before first use. PHP must have OpenSSL and cURL enabled. If SMTP is blocked by the hosting provider, allow outbound SMTP/TLS traffic on port 587.
+Import `database/database.sql` into MySQL before first use. For an existing CT4 database, run `database/migrate_existing.sql` once before deploying this version; runtime page requests no longer execute schema `ALTER TABLE` operations. PHP must have OpenSSL and cURL enabled. If SMTP is blocked by the hosting provider, allow outbound SMTP/TLS traffic on port 587.
 
 ## Role-based access
 Staff accounts can access Reports, Analysis & Dashboard, AI System Assistant, Health, Safety & Welfare, Legal & Compliance, and Asset & Equipment Issuance. System Administration & Security is administrator-only. Administrator dashboards include staff activity tracking for the Health, Safety & Welfare, Legal & Compliance, and Asset & Equipment Issuance modules through audit records.

@@ -6,7 +6,6 @@ RUN apt-get update \
         curl \
         libcurl4-openssl-dev \
         libonig-dev \
-        libpng-dev \
         libzip-dev \
     && docker-php-ext-install -j"$(nproc)" \
         curl \
@@ -49,6 +48,8 @@ RUN { \
         echo 'opcache.enable=1'; \
         echo 'opcache.validate_timestamps=0'; \
         echo 'opcache.memory_consumption=128'; \
+        echo 'opcache.interned_strings_buffer=16'; \
+        echo 'opcache.max_accelerated_files=20000'; \
     } > /usr/local/etc/php/conf.d/app-production.ini
 
 WORKDIR /var/www/html

@@ -22,11 +22,9 @@ CREATE TABLE IF NOT EXISTS admin_notifications (
  sender_user_id INT UNSIGNED NULL,
  is_read TINYINT(1) NOT NULL DEFAULT 0,
  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
- INDEX(user_id), INDEX(type), INDEX(is_read), INDEX(created_at),
+ INDEX(user_id), INDEX(type), INDEX(is_read), INDEX(created_at), INDEX idx_notification_sender_user (sender_user_id),
  CONSTRAINT fk_notification_user FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB;
-ALTER TABLE admin_notifications ADD COLUMN IF NOT EXISTS sender_user_id INT UNSIGNED NULL AFTER sender_role;
-ALTER TABLE admin_notifications ADD INDEX IF NOT EXISTS idx_notification_sender_user (sender_user_id);
 CREATE TABLE IF NOT EXISTS archive_items (
  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
  item_type VARCHAR(40) NOT NULL,
@@ -83,7 +81,8 @@ CREATE TABLE IF NOT EXISTS safety_incidents (
  severity ENUM('Low','Medium','High','Critical') NOT NULL DEFAULT 'Medium',
  status ENUM('Open','Under Investigation','Closed') NOT NULL DEFAULT 'Open',
  description TEXT,
- created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+ created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+ INDEX idx_safety_incident_date_status (incident_date,status)
 ) ENGINE=InnoDB;
 CREATE TABLE IF NOT EXISTS health_records (
  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -92,7 +91,8 @@ CREATE TABLE IF NOT EXISTS health_records (
  record_type VARCHAR(120),
  fitness_status ENUM('Fit','Fit with Restrictions','Unfit','Pending') NOT NULL DEFAULT 'Pending',
  notes TEXT,
- created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+ created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+ INDEX idx_health_checkup_date (checkup_date)
 ) ENGINE=InnoDB;
 CREATE TABLE IF NOT EXISTS health_safety_files (
  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -121,7 +121,8 @@ CREATE TABLE IF NOT EXISTS compliance_obligations (
  due_date DATE NOT NULL,
  priority ENUM('Low','Medium','High','Critical') NOT NULL DEFAULT 'Medium',
  status ENUM('Open','In Progress','Compliant','Overdue') NOT NULL DEFAULT 'Open',
- created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+ created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+ INDEX idx_compliance_due_status (due_date,status)
 ) ENGINE=InnoDB;
 CREATE TABLE IF NOT EXISTS compliance_audits (
  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -130,7 +131,8 @@ CREATE TABLE IF NOT EXISTS compliance_audits (
  auditor VARCHAR(120),
  status ENUM('Scheduled','In Progress','Completed','Closed') NOT NULL DEFAULT 'Scheduled',
  findings TEXT,
- created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+ created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+ INDEX idx_compliance_audit_date_status (audit_date,status)
 ) ENGINE=InnoDB;
 CREATE TABLE IF NOT EXISTS security_events (
  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -152,8 +154,6 @@ CREATE TABLE IF NOT EXISTS assets (
  location VARCHAR(180),
  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
--- Migration for existing installations created before quantity was added.
-ALTER TABLE assets ADD COLUMN IF NOT EXISTS quantity INT UNSIGNED NOT NULL DEFAULT 1 AFTER serial_number;
 CREATE TABLE IF NOT EXISTS asset_issuances (
  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
  asset_id INT UNSIGNED NOT NULL,
@@ -164,6 +164,8 @@ CREATE TABLE IF NOT EXISTS asset_issuances (
  status ENUM('Issued','Returned','Overdue','Not Returned') NOT NULL DEFAULT 'Issued',
  notes TEXT,
  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+ INDEX idx_asset_issuance_status_return (status,return_date),
+ INDEX idx_asset_issuance_expected_return (expected_return),
  CONSTRAINT fk_issuance_asset FOREIGN KEY(asset_id) REFERENCES assets(id) ON DELETE RESTRICT
 ) ENGINE=InnoDB;
 CREATE TABLE IF NOT EXISTS maintenance_records (
@@ -247,3 +249,4 @@ CREATE TABLE IF NOT EXISTS data_storage (
  INDEX(uploaded_by), INDEX(created_at),
  CONSTRAINT fk_storage_user FOREIGN KEY(uploaded_by) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB;
+

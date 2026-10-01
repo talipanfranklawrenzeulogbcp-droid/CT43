@@ -122,7 +122,7 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
                 if (empty($email) || empty($password)) {
                     $error='Email and password are required.';
                 } else {
-                    $stmt=db()->prepare('SELECT id,name,email,role,password_hash FROM users WHERE LOWER(email)=LOWER(?) AND active=1 LIMIT 1');
+                    $stmt=db()->prepare('SELECT id,name,email,role,password_hash FROM users WHERE email=? AND active=1 LIMIT 1');
                     $stmt->execute([$email]);
                     $u=$stmt->fetch();
 
@@ -219,7 +219,7 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
 
       <form method="post" class="auth-form">
         <input type="hidden" name="action" value="verify_otp">
-        <input type="hidden" name="csrf_token" value="<?=e(csrf_token())?">
+        <input type="hidden" name="csrf_token" value="<?=e(csrf_token())?>">
         <div class="field otp-field">
           <label for="otp">One-Time Password</label>
           <input id="otp" class="otp-input" type="text" name="otp" inputmode="numeric"
@@ -233,7 +233,7 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
 
       <form method="post" class="resend-form">
         <input type="hidden" name="action" value="resend_otp">
-        <input type="hidden" name="csrf_token" value="<?=e(csrf_token())?">
+        <input type="hidden" name="csrf_token" value="<?=e(csrf_token())?>">
         <button type="submit" class="auth-link">Resend verification code</button>
       </form>
       <a class="auth-link secondary" href="../auth/logout.php">Use a different account</a>
@@ -253,7 +253,7 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
 
       <form method="post" class="auth-form">
         <input type="hidden" name="action" value="login">
-        <input type="hidden" name="csrf_token" value="<?=e(csrf_token())?">
+        <input type="hidden" name="csrf_token" value="<?=e(csrf_token())?>">
         <div class="field"><label>Email Address</label><input type="email" name="email" autocomplete="username" required value="<?=e($_POST['email']??'')?>"></div>
         <div class="field"><label>Password</label><input type="password" name="password" autocomplete="current-password" required></div>
         <button class="gw-btn primary auth-submit" type="submit">

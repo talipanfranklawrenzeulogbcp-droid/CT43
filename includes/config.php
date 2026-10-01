@@ -105,45 +105,8 @@ define('APP_HTTPS', (
     ((int)($_SERVER['SERVER_PORT'] ?? 0) === 443)
 ));
 
-// Convert uncaught setup/database failures into an actionable response.
-// This prevents a blank HTTP 500 when a hosting environment is missing
-// PDO MySQL or has an unavailable/misconfigured database.
-set_exception_handler(function (Throwable $e): void {
-    error_log('CT4 uncaught exception: '.$e->getMessage().' | '.$e->getFile().':'.$e->getLine());
-
-    $message = $e->getMessage();
-    $isSetup = $e instanceof PDOException
-        || str_contains($message, 'PDO MySQL')
-        || str_contains($message, 'Database connection failed');
-
-    http_response_code($isSetup ? 503 : 500);
-    $accept = strtolower((string)($_SERVER['HTTP_ACCEPT'] ?? ''));
-    $isJson = str_contains($accept, 'application/json')
-        || str_starts_with((string)($_SERVER['REQUEST_URI'] ?? ''), '/services/api/');
-
-    if ($isJson) {
-        header('Content-Type: application/json; charset=UTF-8');
-        echo json_encode([
-            'ok' => false,
-            'error' => $isSetup
-                ? $message
-                : 'The server could not complete the request. Check the PHP error log.'
-        ], JSON_UNESCAPED_SLASHES);
-        return;
-    }
-
-    $safe = htmlspecialchars(
-        $isSetup ? $message : 'The server could not complete the request. Check the PHP error log.',
-        ENT_QUOTES,
-        'UTF-8'
-    );
-    // This handler runs during bootstrap, before helpers/auth may be loaded.
-    // Never call app_base_path() here unless it is already defined, otherwise
-    // the diagnostic page can trigger a second fatal error and hide the cause.
-    $basePath = function_exists('app_base_path') ? app_base_path() : '';
-    $healthUrl = rtrim($basePath, '/') . '/health.php';
-    echo '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>CT4 Server Setup</title><style>body{font-family:Arial,sans-serif;background:#f8fafc;color:#172033;margin:0;padding:40px}.card{max-width:760px;margin:auto;background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:28px;box-shadow:0 8px 30px rgba(15,23,42,.08)}h1{margin-top:0}code{background:#f1f5f9;padding:2px 5px;border-radius:4px}a{color:#4f46e5}</style></head><body><div class="card"><h1>Core Transaction 4 — Server Setup</h1><p>'.$safe.'</p><p>Open <a href="'.htmlspecialchars($healthUrl,ENT_QUOTES,'UTF-8').'">health.php</a> for the server readiness check.</p></div></body></html>';
-});
+// Exception handling is centralised in includes/error_handler.php so PHP,
+// database and deployment diagnostics all use the same handler.
 
 // Apply secure session cookie settings on first include.
 if (session_status() === PHP_SESSION_NONE) {

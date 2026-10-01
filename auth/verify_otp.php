@@ -11,7 +11,10 @@ if (!$pending) redirect('/auth/login.php');
 $error='';
 $success='';
 if ($_SERVER['REQUEST_METHOD']==='POST') {
-    try {
+    if (!verify_csrf_token((string)($_POST['csrf_token'] ?? ''))) {
+        $error='Your session expired or the request is invalid. Please try again.';
+    } else {
+      try {
         $action=$_POST['action']??'verify';
 
         if ($action==='resend') {
@@ -59,8 +62,10 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
                 redirect('/dashboard.php');
             }
         }
-    } catch(Throwable $e) {
+      } catch(Throwable $e) {
         $error='Unable to process the verification request. Please try again.';
+        error_log('Standalone OTP verification failed: '.$e->getMessage());
+      }
     }
 }
 ?>
@@ -89,6 +94,7 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
     <?php if($error):?><div class="notice error auth-error"><?=e($error)?></div><?php endif;?>
     <?php if($success):?><div class="notice success auth-error"><?=e($success)?></div><?php endif;?>
     <form method="post" class="auth-form">
+      <input type="hidden" name="csrf_token" value="<?=e(csrf_token())?>">
       <input type="hidden" name="action" value="verify">
       <div class="field otp-field">
         <label for="otp">One-Time Password</label>
@@ -97,6 +103,7 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
       <button class="gw-btn primary auth-submit" type="submit"><span class="material-symbols-outlined">verified</span> Verify &amp; Continue</button>
     </form>
     <form method="post" class="resend-form">
+      <input type="hidden" name="csrf_token" value="<?=e(csrf_token())?>">
       <input type="hidden" name="action" value="resend">
       <button type="submit" class="auth-link">Resend verification code</button>
     </form>

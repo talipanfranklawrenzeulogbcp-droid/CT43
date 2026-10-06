@@ -19,7 +19,7 @@ $loginLimit=$showAllLogins?100:5;
 $logins=$svc->logins($loginLimit,$loginDate);
 page_header('System Administration & Security','security');show_flash();?>
 <div class="gw-breadcrumb"><span>Great Solomon Manpower Services Inc.</span><span>/</span><strong>System Administration &amp; Security</strong></div>
-<section class="gw-hero"><div><div class="eyebrow">MODULE 3</div><h1>System Administration &amp; Security</h1><p>Manage users, roles, security events and login history.</p></div></section>
+<section class="gw-hero module-hero"><div><div class="eyebrow">MODULE 3</div><h1>System Administration &amp; Security</h1><p>Manage users, roles, security events and login history.</p></div></section>
 <section class="gw-quick-actions">
 <a href="#create-user"><span class="material-symbols-outlined">person_add</span> Create User</a>
 <a href="#user-accounts"><span class="material-symbols-outlined">manage_accounts</span> User Accounts</a>

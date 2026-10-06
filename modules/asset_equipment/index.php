@@ -3,9 +3,9 @@ require_once __DIR__.'/../../includes/helpers.php'; require_once __DIR__.'/../..
 if($_SERVER['REQUEST_METHOD']==='POST'){ verify_csrf();try{$message=$svc->handle((string)($_POST['action']??''),$_POST,current_user());flash('success',$message);}catch(Throwable $e){flash('error','Unable to save record: '.$e->getMessage());}redirect('/modules/asset_equipment/index.php');}
 $assets=$svc->assets(); $issuances=$svc->issuances();
 $u=current_user();
-page_header('Asset & Equipment Issuance','assets');show_flash();?>
-<div class="gw-breadcrumb"><span>Great Solomon Manpower Services Inc.</span><span>/</span><strong>Asset &amp; Equipment Issuance</strong></div>
-<section class="gw-hero"><div><div class="eyebrow">MODULE 4</div><h1>Asset &amp; Equipment Issuance Tracker</h1><p>Track equipment inventory, items available for borrowing, issuance, and returns.</p></div></section>
+page_header('Asset & Equipment Issuance Tracker','assets');show_flash();?>
+<div class="gw-breadcrumb"><span>Great Solomon Manpower Services Inc.</span><span>/</span><strong>Asset &amp; Equipment Issuance Tracker</strong></div>
+<section class="gw-hero module-hero"><div><div class="eyebrow">MODULE 4</div><h1>Asset &amp; Equipment Issuance Tracker</h1><p>Track equipment inventory, items available for borrowing, issuance, and returns.</p></div></section>
 
 <section class="gw-quick-actions">
   <a href="#available-items"><span class="material-symbols-outlined">inventory_2</span> Items to Borrow</a>

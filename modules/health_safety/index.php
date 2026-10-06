@@ -9,7 +9,7 @@ $incidents=$svc->incidents($filterDate);$health=$svc->healthRecords($filterDate)
 $stats=$svc->stats($filterDate);
 page_header('Health, Safety & Welfare','health');show_flash(); ?>
 <div class="gw-breadcrumb"><span>Great Solomon Manpower Services Inc.</span><span>/</span><strong>Health, Safety &amp; Welfare</strong></div>
-<section class="gw-hero"><div><div class="eyebrow">MODULE 1</div><h1>Health, Safety &amp; Welfare</h1><p>Maintain employee health records, safety incident investigations, follow-ups and corrective actions in one workflow.</p></div></section>
+<section class="gw-hero module-hero"><div><div class="eyebrow">MODULE 1</div><h1>Health, Safety &amp; Welfare</h1><p>Maintain employee health records, safety incident investigations, follow-ups and corrective actions in one workflow.</p></div></section>
 <section class="gw-quick-actions">
 <a href="#health-record-form"><span class="material-symbols-outlined">medical_information</span> Add Health Record</a>
 <a href="#incident-form"><span class="material-symbols-outlined">report_problem</span> Report Safety Incident</a>

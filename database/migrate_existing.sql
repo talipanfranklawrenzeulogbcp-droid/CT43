@@ -20,6 +20,3 @@ ALTER TABLE compliance_obligations ADD INDEX idx_compliance_due_status (due_date
 ALTER TABLE compliance_audits ADD INDEX idx_compliance_audit_date_status (audit_date,status);
 ALTER TABLE asset_issuances ADD INDEX idx_asset_issuance_status_return (status,return_date);
 ALTER TABLE asset_issuances ADD INDEX idx_asset_issuance_expected_return (expected_return);
-
-DROP TABLE IF EXISTS otp_requests;
-ALTER TABLE login_history MODIFY COLUMN status ENUM('Success','Failed') NOT NULL;

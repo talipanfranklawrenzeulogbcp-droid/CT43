@@ -105,6 +105,24 @@ function smtp_send_message(string $recipient, string $subject, string $htmlBody)
     }
 }
 
+function send_otp_email(string $recipient, string $recipientName, string $otp): void {
+    $safeName = htmlspecialchars($recipientName ?: 'Administrator', ENT_QUOTES, 'UTF-8');
+    $safeOtp = htmlspecialchars($otp, ENT_QUOTES, 'UTF-8');
+
+    $body = '<!doctype html><html><body style="margin:0;font-family:Arial,sans-serif;background:#f7f3ff;padding:30px">'
+          . '<div style="max-width:560px;margin:auto;background:#fff;border-radius:16px;padding:30px;border:1px solid #ddd6fe">'
+          . '<h2 style="color:#6d28d9;margin-top:0">Great Solomon Manpower Services Inc.</h2>'
+          . '<p style="color:#475569">Core Transaction 4 security verification</p>'
+          . '<p>Hello '.$safeName.',</p>'
+          . '<p>Your one-time verification code is:</p>'
+          . '<div style="font-size:34px;font-weight:800;letter-spacing:8px;color:#6d28d9;text-align:center;padding:18px;background:#f3e8ff;border-radius:12px">'.$safeOtp.'</div>'
+          . '<p>This code expires in '.OTP_EXPIRY_MINUTES.' minutes. If you did not attempt to sign in, you can ignore this email.</p>'
+          . '<p style="color:#6b7280;font-size:13px">Sent by the CT4 security mailbox.</p>'
+          . '</div></body></html>';
+
+    smtp_send_message($recipient, 'Great Solomon Manpower Services Inc. — Security Verification Code', $body);
+}
+
 function send_feedback_email(string $recipient, string $senderName, string $senderRole, string $feedback): void {
     $name=htmlspecialchars($senderName,ENT_QUOTES,'UTF-8');
     $role=htmlspecialchars($senderRole,ENT_QUOTES,'UTF-8');

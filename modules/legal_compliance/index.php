@@ -14,7 +14,7 @@ $u=current_user();$reportDate=(string)($_GET['report_date']??'');$showAllReports
 $actions=$svc->actionItems();$audits=$svc->audits();$stats=$svc->stats();$documentRequirements=$svc->documentRequirements();$employeeDocumentRows=$svc->employeeDocumentRows();$documentStats=$svc->documentStats();$selectedEmployee=trim((string)($_GET['employee']??''));$selectedEmployeeDocuments=$selectedEmployee!==''?$svc->employeeDocuments($selectedEmployee):[];$employeeNames=$svc->employeeNames();$auditDate=(string)($_GET['audit_date']??'');$showAllAudit=isset($_GET['audit_all']);$staffAdminAudit=(($u['role']??'')==='Administrator')?service('audit')->latestStaffAdmin($auditDate,$showAllAudit?null:5):[];
 page_header('Legal & Compliance','legal');show_flash(); ?>
 <div class="gw-breadcrumb"><span>Great Solomon Manpower Services Inc.</span><span>/</span><strong>Legal &amp; Compliance</strong></div>
-<section class="gw-hero"><div><div class="eyebrow">MODULE 2</div><h1>Legal &amp; Compliance</h1><p>Record compliance reports, obligations, audits, findings, evidence, corrective actions and review dates while preserving the existing report workflow.</p></div></section>
+<section class="gw-hero module-hero"><div><div class="eyebrow">MODULE 2</div><h1>Legal &amp; Compliance</h1><p>Record compliance reports, obligations, audits, findings, evidence, corrective actions and review dates while preserving the existing report workflow.</p></div></section>
 <section class="gw-quick-actions">
 <a href="#compliance-report"><span class="material-symbols-outlined">description</span> Add Compliance Report</a>
 <a href="#compliance-obligation"><span class="material-symbols-outlined">event_note</span> Add Obligation</a>

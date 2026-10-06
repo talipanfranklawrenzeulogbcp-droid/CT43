@@ -69,7 +69,9 @@ function escapeHtml(v){return String(v).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':
 
 function toggleUserMenu(){
  const m=document.getElementById('userMenu'); if(!m)return;
+ const opening=!m.classList.contains('open');
  m.classList.toggle('open');
+ if(opening) refreshUserMenuNotifications();
 }
 document.addEventListener('click',e=>{
  const wrap=document.querySelector('.user-menu-wrap');
@@ -77,53 +79,73 @@ document.addEventListener('click',e=>{
 });
 
 function initNotificationWatcher(){
- const topButton=document.querySelector('.gw-notification-trigger');
- if(!topButton || !window.CURRENT_USER?.role)return;
+ const userButton=document.querySelector('.gw-user-button');
+ if(!userButton || !window.CURRENT_USER?.role)return;
  let lastKnownId=0;
  const seeded=[...(window.ADMIN_NOTIFICATIONS||[]),...(window.STAFF_NOTIFICATIONS||[])];
  if(seeded.length) lastKnownId=Math.max(...seeded.map(n=>Number(n.id)||0));
- let first=true;
  const updateBadge=(count)=>{
+   let badge=userButton?.querySelector('.user-notification-badge');
+   const menuCount=document.querySelector('.user-menu-notification-count');
    if(count>0){
-     topButton?.classList.add('has-new-notification');
-     let topBadge=topButton?.querySelector('.top-notification-badge');
-     if(topButton && !topBadge){topBadge=document.createElement('span');topBadge.className='top-notification-badge';topButton.appendChild(topBadge);}
-     if(topBadge)topBadge.textContent=count>99?'99+':String(count);
-     topButton.setAttribute('aria-label',`Notifications${count>0?` — ${count} unread`:''}`);
+     if(!badge){
+       badge=document.createElement('span');
+       badge.className='user-notification-badge';
+       userButton.appendChild(badge);
+     }
+     badge.textContent=count>99?'99+':String(count);
+     badge.setAttribute('aria-label',`${count} unread notification${count===1?'':'s'}`);
+     if(menuCount)menuCount.textContent=count>99?'99+':String(count);
    }else{
-     topButton?.classList.remove('has-new-notification');
-     topButton?.querySelector('.top-notification-badge')?.remove();
-     topButton.setAttribute('aria-label','Open notifications');
+     badge?.remove();
+     menuCount?.remove();
    }
- };
- const notifyNew=(latest)=>{
-   if(!latest)return;
-   const title=latest.title||'New notification';
-   const text=latest.message||'You have a new notification.';
-   let toast=document.getElementById('notificationToast');
-   if(!toast){
-     toast=document.createElement('div');
-     toast.id='notificationToast';
-     toast.className='notification-toast';
-     document.body.appendChild(toast);
-   }
-   toast.innerHTML=`<span class="material-symbols-outlined">notifications_active</span><div><strong>${escapeHtml(title)}</strong><span>${escapeHtml(text.length>120?text.slice(0,117)+'...':text)}</span></div><button type="button" aria-label="Open notifications"><span class="material-symbols-outlined">arrow_forward</span></button>`;
-   toast.querySelector('button')?.addEventListener('click',()=>{toast.classList.remove('show');showNotificationModal();});
-   requestAnimationFrame(()=>toast.classList.add('show'));
-   clearTimeout(window.__notificationToastTimer);
-   window.__notificationToastTimer=setTimeout(()=>toast.classList.remove('show'),7000);
  };
  const check=()=>fetch(`${window.APP_BASE||''}/includes/notifications_status.php`,{credentials:'same-origin',headers:{'X-Requested-With':'XMLHttpRequest'},cache:'no-store'})
    .then(r=>r.ok?r.json():null).then(data=>{
      if(!data?.ok)return;
      updateBadge(Number(data.count)||0);
      const id=Number(data.latest?.id)||0;
-     if(!first && id>lastKnownId)notifyNew(data.latest);
      if(id>lastKnownId)lastKnownId=id;
-     first=false;
-   }).catch(()=>{first=false;});
+   }).catch(()=>{});
  check();
  window.__notificationWatcher=setInterval(check,15000);
+}
+
+async function refreshUserMenuNotifications(){
+ const box=document.getElementById('userMenuNotifications');
+ if(!box)return;
+ try{
+   const r=await fetch(`${window.APP_BASE||''}/includes/notifications.php?action=list`,{
+     credentials:'same-origin',
+     headers:{'X-Requested-With':'XMLHttpRequest'},cache:'no-store'
+   });
+   const d=await r.json();
+   if(!r.ok || !d?.ok || !Array.isArray(d.items))return;
+   const allowed=new Set(['feedback','feedback_reply','data_transfer','file_release','file_request']);
+   const notes=d.items.filter(n=>allowed.has(String(n.type||''))).slice(0,5);
+   const count=Number(d.unread)||0;
+   let badge=document.querySelector('.gw-user-button .user-notification-badge');
+   if(count>0){
+     if(!badge){
+       badge=document.createElement('span'); badge.className='user-notification-badge';
+       document.querySelector('.gw-user-button')?.appendChild(badge);
+     }
+     badge.textContent=count>99?'99+':String(count);
+     badge.setAttribute('aria-label',`${count} unread notification${count===1?'':'s'}`);
+   }else badge?.remove();
+   const iconFor=n=>['feedback','feedback_reply'].includes(String(n.type||''))?'feedback':(['file_release','file_request'].includes(String(n.type||''))?'folder_open':'sync');
+   const labelFor=n=>['feedback','feedback_reply'].includes(String(n.type||''))?'Feedback':'Data / File Tracking';
+   const items=notes.map(n=>{
+     const unread=Number(n.is_read)===0;
+     return `<button type="button" class="user-menu-notification-item ${unread?'unread':''}" onclick="showNotificationModal()">
+       <span class="user-menu-notification-icon"><span class="material-symbols-outlined">${iconFor(n)}</span></span>
+       <span class="user-menu-notification-copy"><strong>${escapeHtml(n.title||labelFor(n))}</strong><small>${escapeHtml(labelFor(n))} · ${escapeHtml(n.message||'')}</small></span>
+       ${unread?'<span class="user-menu-notification-dot" aria-label="Unread"></span>':''}
+     </button>`;
+   }).join('');
+   box.innerHTML=`<div class="user-menu-notifications-head"><div><strong>Notifications</strong><span>Feedback and new data/files</span></div>${count>0?`<span class="user-menu-notification-count">${count>99?'99+':count}</span>`:''}</div>${items||'<div class="user-menu-notifications-empty"><span class="material-symbols-outlined">notifications_none</span><span>No feedback or new data/files.</span></div>'}${items?'<button type="button" class="user-menu-notifications-view" onclick="showNotificationModal()">View all notifications</button>':''}`;
+ }catch(_){}
 }
 
 function feedbackStatusBadge(status){
@@ -375,7 +397,7 @@ async function showNotificationModal(fresh=true){
  refreshFeedbackDataTable();
  fetch(`${window.APP_BASE||''}/includes/mark_notifications_read.php`,{method:'POST',headers:{'X-Requested-With':'XMLHttpRequest','X-CSRF-Token':window.CSRF_TOKEN||''},credentials:'same-origin'}).catch(()=>{});
  [...(window.ADMIN_NOTIFICATIONS||[]),...(window.STAFF_NOTIFICATIONS||[])].forEach(n=>n.is_read=1);
- document.querySelectorAll('.notification-badge,.top-notification-badge').forEach(el=>el.remove());
+ document.querySelectorAll('.notification-badge,.top-notification-badge,.user-notification-badge,.user-menu-notification-count').forEach(el=>el.remove());
 }
 function filterFeedbackInbox(){
  const list=document.getElementById('feedbackThreadList'); if(!list)return;

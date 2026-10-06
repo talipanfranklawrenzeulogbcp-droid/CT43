@@ -2,7 +2,7 @@ FROM php:8.2-apache
 
 ENV APACHE_DOCUMENT_ROOT=/var/www/html
 
-RUN docker-php-ext-install pdo_mysql opcache \
+RUN docker-php-ext-install -j"$(nproc)" pdo_mysql opcache \
     && a2enmod rewrite headers expires \
     && printf '%s\n' 'ServerName localhost' > /etc/apache2/conf-available/ct4-servername.conf \
     && a2enconf ct4-servername

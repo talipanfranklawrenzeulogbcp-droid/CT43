@@ -96,6 +96,6 @@ Staff accounts can access Reports, Analysis & Dashboard, AI System Assistant, He
 
 ## Deployment configuration
 
-For Docker/HostForge deployment, use port `80` and health-check path `/health.php`.
+For Docker/HostForge deployment, use port `80` and health-check path `/health.php`. The Docker build compiles PHP extensions in parallel and excludes local archives, logs, caches, secrets, and development artifacts from the image build context to reduce build time.
 Set the server environment variables from `.env.example`. The application reads `DATABASE_URL` first when supplied, otherwise the `DB_*` variables (`DB_HOST`, `DB_PORT`, `DB_DATABASE`/`DB_NAME`, `DB_USERNAME`/`DB_USER`, `DB_PASSWORD`). Gmail OTP uses `GSMS_MAIL_*` and `GSMS_OTP_SENDER_EMAIL`; Gemini uses `GEMINI_API_KEY` and `GEMINI_MODEL`.
 Do not upload a real `.env` containing secrets into the deployment image.

@@ -23,7 +23,7 @@ RUN apt-get update \
 # Allow the application's .htaccess routing and security headers.
 RUN a2enmod headers rewrite \
     && { \
-        echo '<VirtualHost *:80>'; \
+        echo '<VirtualHost *:8080>'; \
         echo '    ServerName localhost'; \
         echo '    ServerAlias *'; \
         echo '    DocumentRoot /var/www/html'; \
@@ -62,9 +62,14 @@ RUN mkdir -p storage/logs storage/exports storage/reports \
     && chmod -R 0755 storage \
     && rm -f .env
 
-EXPOSE 80
+EXPOSE 8080
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD php -r '$c=@file_get_contents("http://127.0.0.1/health.php"); exit($c===false ? 1 : 0);'
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=5 \
+    CMD php -r '$p=(int)(getenv("PORT")?:8080); $c=@file_get_contents("http://127.0.0.1:".$p."/health.php"); if($c===false) exit(1); $j=json_decode($c,true); exit(($j["status"]??"") === "ok" ? 0 : 1);'
 
-CMD ["apache2-foreground"]
+ENV PORT=8080
+
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
+CMD ["/usr/local/bin/docker-entrypoint.sh"]

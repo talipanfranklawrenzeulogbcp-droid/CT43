@@ -21,6 +21,7 @@ final class AdminSecurityService {
         'logins'=>(int)$this->pdo->query("SELECT COUNT(*) FROM login_history WHERE status='Success'")->fetchColumn(),
     ]; }
     public function handle(string $action,array $data,?array $user): string {
+        if(($user['role'] ?? '') !== 'Administrator') throw new RuntimeException('Administrator access is required.');
         if($action==='add_user'){
             $name=trim((string)($data['name']??'')); $email=trim((string)($data['email']??'')); $password=(string)($data['password']??''); $role=(string)($data['role']??'Staff');
             if(!in_array($role,['Administrator','Staff'],true)) throw new RuntimeException('Invalid role selected.');
@@ -39,7 +40,11 @@ final class AdminSecurityService {
             if($targetId<=0 || $name==='' || !filter_var($email,FILTER_VALIDATE_EMAIL)) throw new RuntimeException('Enter a valid name and email address.');
             if(!in_array($role,['Administrator','Staff'],true)) throw new RuntimeException('Invalid role selected.');
             if($password!=='' && strlen($password)<6) throw new RuntimeException('New password must be at least 6 characters.');
-            $check=$this->pdo->prepare('SELECT id FROM users WHERE email=? AND id<>?'); $check->execute([$email,$targetId]); if($check->fetch()) throw new RuntimeException('That email is already in use.');
+            $check=$this->pdo->prepare('SELECT id,name,email FROM users WHERE id<>? AND (email=? OR name=?) LIMIT 2'); $check->execute([$targetId,$email,$name]);
+            foreach($check->fetchAll(PDO::FETCH_ASSOC) as $existing){
+                if(strcasecmp((string)$existing['email'],$email)===0) throw new RuntimeException('That email is already in use.');
+                if(strcasecmp(trim((string)$existing['name']),$name)===0) throw new RuntimeException('That name is already in use.');
+            }
             if($password!==''){
                 $s=$this->pdo->prepare('UPDATE users SET name=?,email=?,role=?,password_hash=? WHERE id=?'); $s->execute([$name,$email,$role,password_hash($password,PASSWORD_DEFAULT),$targetId]);
             } else {

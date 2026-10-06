@@ -4,6 +4,7 @@ require_once __DIR__.'/service_client.php';
 require_login();
 $storage=service('storage');
 $action=(string)($_POST['action'] ?? $_GET['action'] ?? 'list');
+if ($_SERVER['REQUEST_METHOD']==='POST') verify_csrf();
 
 if($action==='list'){
     header('Content-Type: application/json; charset=utf-8');
@@ -23,6 +24,7 @@ if($action==='download_all'){
         $name=(string)$file['file_name'];
         $base=$name; $i=1;
         while(isset($used[$name])){ $name=pathinfo($base,PATHINFO_FILENAME).'_'.$i.(pathinfo($base,PATHINFO_EXTENSION)?'.'.pathinfo($base,PATHINFO_EXTENSION):''); $i++; }
+        $name=ltrim(str_replace(['\\','/'], '_', $name), '.');
         $used[$name]=true;
         $zip->addFromString($name,(string)$file['file_data']);
     }
@@ -43,7 +45,9 @@ if($action==='view' || $action==='download'){
     header('Content-Type: '.($file['file_type']?:'application/octet-stream'));
     header('Content-Length: '.strlen((string)$file['file_data']));
     header('X-Content-Type-Options: nosniff');
-    header('Content-Disposition: '.($action==='download'?'attachment':'inline').'; filename="'.$safeName.'"');
+    $mime=(string)($file['file_type']?:'application/octet-stream');
+    $inlineAllowed=in_array(strtolower($mime),['application/pdf','image/png','image/jpeg','image/gif','image/webp'],true);
+    header('Content-Disposition: '.($action==='download' || !$inlineAllowed ? 'attachment' : 'inline').'; filename="'.$safeName.'"');
     echo $file['file_data'];
     exit;
 }

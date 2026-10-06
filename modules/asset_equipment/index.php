@@ -1,6 +1,6 @@
 <?php
 require_once __DIR__.'/../../includes/helpers.php'; require_once __DIR__.'/../../includes/service_client.php'; require_login(); $svc=service('assets');
-if($_SERVER['REQUEST_METHOD']==='POST'){try{$message=$svc->handle((string)($_POST['action']??''),$_POST,current_user());flash('success',$message);}catch(Throwable $e){flash('error','Unable to save record: '.$e->getMessage());}redirect('/modules/asset_equipment/index.php');}
+if($_SERVER['REQUEST_METHOD']==='POST'){ verify_csrf();try{$message=$svc->handle((string)($_POST['action']??''),$_POST,current_user());flash('success',$message);}catch(Throwable $e){flash('error','Unable to save record: '.$e->getMessage());}redirect('/modules/asset_equipment/index.php');}
 $assets=$svc->assets(); $issuances=$svc->issuances();
 $u=current_user();
 page_header('Asset & Equipment Issuance','assets');show_flash();?>
@@ -33,6 +33,7 @@ page_header('Asset & Equipment Issuance','assets');show_flash();?>
     <table class="data-table">
       <thead>
         <tr>
+          <th>Picture</th>
           <th>Asset Tag</th>
           <th>Item / Description</th>
           <th>Category</th>
@@ -55,6 +56,15 @@ page_header('Asset & Equipment Issuance','assets');show_flash();?>
           };
         ?>
         <tr>
+          <td>
+            <?php if(!empty($a['image_data'])): ?>
+              <button type="button" class="asset-picture-thumb" onclick='showAssetPicture(<?= (int)$a['id'] ?>, <?=json_encode((string)$a['name'],JSON_HEX_TAG|JSON_HEX_APOS|JSON_HEX_QUOT|JSON_HEX_AMP)?>)' title="View asset picture" aria-label="View asset picture">
+                <img src="<?=e(url('/modules/asset_equipment/asset_image.php?id='.(int)$a['id']))?>" alt="<?=e($a['name'])?>">
+              </button>
+            <?php else: ?>
+              <span class="asset-picture-placeholder" title="No picture">image</span>
+            <?php endif; ?>
+          </td>
           <td><strong><?=e($a['asset_tag'])?></strong></td>
           <td><?=e($a['name'])?><?php if(!empty($a['serial_number'])): ?><br><small style="color:#64748b">SN: <?=e($a['serial_number'])?></small><?php endif; ?></td>
           <td><?=e($a['category'] ?: 'General')?></td>
@@ -68,11 +78,19 @@ page_header('Asset & Equipment Issuance','assets');show_flash();?>
             <?php else: ?>
               <span style="color:#94a3b8;font-size:12px;">Unavailable</span>
             <?php endif; ?>
+            <form method="post" enctype="multipart/form-data" style="margin-top:5px">
+              <?=csrf_field()?>
+              <input type="hidden" name="action" value="update_asset_picture">
+              <input type="hidden" name="asset_id" value="<?= (int)$a['id'] ?>">
+              <label class="gw-btn ghost" style="padding:4px 8px;font-size:11px;cursor:pointer;display:inline-block">
+                <?=!empty($a['image_data'])?'Change Picture':'Add Picture'?><input type="file" name="asset_image" accept="image/jpeg,image/png,image/webp,image/gif" style="display:none" onchange="this.form.submit()">
+              </label>
+            </form>
           </td>
         </tr>
         <?php endforeach; ?>
         <?php if(!$assets): ?>
-        <tr><td colspan="8" class="empty">No equipment or assets registered yet. You can register items below.</td></tr>
+        <tr><td colspan="9" class="empty">No equipment or assets registered yet. You can register items below.</td></tr>
         <?php endif; ?>
       </tbody>
     </table>
@@ -81,7 +99,7 @@ page_header('Asset & Equipment Issuance','assets');show_flash();?>
 
 <section class="record-form" id="issue" style="margin-top:20px">
   <div class="gw-panel-head"><h2>Issue Equipment</h2><span>Assign an available registered asset to an employee.</span></div>
-  <form method="post">
+  <form method="post"><?=csrf_field()?>
     <input type="hidden" name="action" value="issue_asset">
     <div class="form-grid">
       <div>
@@ -107,7 +125,7 @@ page_header('Asset & Equipment Issuance','assets');show_flash();?>
     <h2>Register Equipment / Asset</h2>
     <span>Add new equipment or items to the inventory so they can be borrowed.</span>
   </div>
-  <form method="post">
+  <form method="post" enctype="multipart/form-data"><?=csrf_field()?>
     <input type="hidden" name="action" value="add_asset">
     <div class="form-grid">
       <div><label>Asset Tag</label><input name="asset_tag" required placeholder="e.g. AST-0007"></div>
@@ -116,6 +134,7 @@ page_header('Asset & Equipment Issuance','assets');show_flash();?>
       <div><label>Serial Number</label><input name="serial_number" placeholder="Optional serial number"></div>
       <div><label>Quantity</label><input type="number" name="quantity" min="1" value="1" required></div>
       <div><label>Location</label><input name="location" placeholder="e.g. Head Office, Warehouse"></div>
+      <div><label>Asset Picture</label><input type="file" name="asset_image" accept="image/jpeg,image/png,image/webp,image/gif"><small style="display:block;color:#64748b;margin-top:5px">Optional. JPG, PNG, WEBP or GIF, up to 5 MB.</small></div>
     </div>
     <div class="record-actions">
       <button class="gw-btn secondary">Register Item</button>
@@ -140,7 +159,7 @@ page_header('Asset & Equipment Issuance','assets');show_flash();?>
           <td><span class="status-pill status-pill-<?=match($r['status']){'Returned'=>'success','Overdue'=>'warning','Not Returned'=>'warning',default=>'info'}?>"><?=e($r['status'])?></span></td>
           <td><?=e($r['notes'])?></td>
           <td>
-            <form method="post">
+            <form method="post"><?=csrf_field()?>
               <input type="hidden" name="action" value="update_issuance_status">
               <input type="hidden" name="issuance_id" value="<?=$r['id']?>">
               <select name="status" onchange="this.form.submit()">
@@ -161,6 +180,13 @@ page_header('Asset & Equipment Issuance','assets');show_flash();?>
 </section>
 
 <script>
+function showAssetPicture(assetId, assetName) {
+  const root = document.getElementById('modalRoot');
+  if (!root) return;
+  const src = <?=json_encode(url('/modules/asset_equipment/asset_image.php'))?> + '?id=' + encodeURIComponent(String(assetId));
+  root.innerHTML = `<div class="gw-modal-backdrop" onclick="if(event.target===this)closeModal()"><div class="gw-modal" style="width:min(900px,100%)"><div class="gw-modal-head"><div><strong>${escapeHtml(assetName || 'Asset Picture')}</strong><small>Asset / equipment picture</small></div><button class="gw-modal-close" onclick="closeModal()" aria-label="Close">×</button></div><div class="gw-modal-body" style="text-align:center"><img src="${src}" alt="${escapeHtml(assetName || 'Asset Picture')}" style="max-width:100%;max-height:70vh;object-fit:contain;border-radius:12px"></div></div></div>`;
+}
+
 function selectAssetToBorrow(assetId) {
   const sel = document.getElementById('assetSelect');
   if (sel) {

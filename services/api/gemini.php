@@ -97,7 +97,7 @@ function ai_db_context(): string {
         }
     } catch (Throwable $e) {}
 
-    /* Never expose password hashes, biometric credential data, SMTP credentials, API keys, or session secrets. */
+    /* Never expose password hashes, OTP hashes, SMTP credentials, API keys, or session secrets. */
     return implode("\n", $parts);
 }
 
@@ -148,7 +148,7 @@ You are an in-app support assistant, not a general unrestricted chatbot.
 Answer questions about the CT4 system, its modules, workflows, records, dashboards, security features, and the supplied system documentation.
 Use the live application context below as the source of truth for current counts and activity.
 Be concise, practical, and clear. If a fact is not present in the context, say you do not have enough information rather than inventing it.
-Do not reveal, reconstruct, guess, or output passwords, password hashes, biometric authentication data, SMTP credentials, API keys, session tokens, database credentials, or other secrets.
+Do not reveal, reconstruct, guess, or output passwords, password hashes, OTPs, SMTP credentials, API keys, session tokens, database credentials, or other secrets.
 Do not provide another user's private credentials or authentication data. You may explain security concepts and login history at an aggregate level.
 The logged-in user's identity and role are provided separately. Respect the user's role and do not claim permissions that are not established by the application.
 If asked to perform an action, explain the appropriate module/button and workflow; do not pretend that you performed a database change unless this endpoint actually performs it.

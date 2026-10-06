@@ -109,11 +109,35 @@ define('DB_USER', getenv('GSMS_DB_USER') ?: 'root');
 define('DB_PASS', getenv('GSMS_DB_PASS') ?: '');
 define('DB_CONNECT_TIMEOUT', max(1, (int)(getenv('GSMS_DB_CONNECT_TIMEOUT') ?: 8)));
 
-// --- Authentication: WebAuthn / Face ID ------------------------------------
-// Biometric templates are never stored by this application; the platform
-// authenticator keeps them on the user's device.
-
-define('WEBAUTHN_TIMEOUT_MS', max(30000, min(180000, (int)(getenv('GSMS_WEBAUTHN_TIMEOUT_MS') ?: 120000))));
+// --- Gmail SMTP ---
+define('MAIL_HOST', getenv('GSMS_MAIL_HOST') ?: 'smtp.gmail.com');
+// Gmail supports STARTTLS on 587 and implicit TLS on 465. 587 remains the
+// default for compatibility, while mailer.php can fall back to 465 if a host
+// blocks STARTTLS or the configured port is unavailable.
+define('MAIL_PORT', max(1, (int)(getenv('GSMS_MAIL_PORT') ?: 465)));
+define('MAIL_USERNAME', trim((string)(getenv('GSMS_MAIL_USERNAME') ?: 'governancesafety21@gmail.com')));
+define('MAIL_PASSWORD', (string)(getenv('GSMS_MAIL_PASSWORD') ?: ''));
+// When the sender is not explicitly configured, use the authenticated Gmail
+// account. A fixed sender address can cause Gmail 553/550 errors when a
+// deployment changes only GSMS_MAIL_USERNAME.
+define('MAIL_FROM_EMAIL', trim((string)(getenv('GSMS_MAIL_FROM_EMAIL') ?: MAIL_USERNAME)));
+define('MAIL_FROM_NAME', getenv('GSMS_MAIL_FROM_NAME') ?: 'Great Solomon Manpower Services Inc. Core Transaction 4');
+define('OTP_SENDER_EMAIL', trim((string)(getenv('GSMS_OTP_SENDER_EMAIL') ?: MAIL_FROM_EMAIL)));
+define('MAIL_FALLBACK_ENABLED', filter_var(getenv('GSMS_MAIL_FALLBACK') ?: 'true', FILTER_VALIDATE_BOOLEAN));
+define('OTP_EXPIRY_MINUTES', 10);
+define('OTP_MAX_ATTEMPTS',    5);
+// Short server-side resend cooldown prevents accidental duplicate sends while
+// keeping the login flow responsive. The browser also mirrors this value.
+define('OTP_RESEND_COOLDOWN_SECONDS', 15);
+// Keep the pending-login session alive long enough to allow an expired OTP to be resent.
+// This does not extend the lifetime of the OTP itself; each generated code still expires separately.
+define('OTP_PENDING_SESSION_MINUTES', 30);
+// Keep SMTP failures from making login appear frozen; successful Gmail delivery
+// is unaffected by this connection/response timeout.
+define('MAIL_SMTP_TIMEOUT_SECONDS', max(5, (int)(getenv('GSMS_MAIL_TIMEOUT') ?: 8)));
+// Retry transient SMTP/network failures before falling back to the server mailer.
+define('OTP_MAIL_RETRIES', max(1, min(5, (int)(getenv('GSMS_OTP_MAIL_RETRIES') ?: 3))));
+define('OTP_MAIL_RETRY_DELAY_MS', max(100, min(2000, (int)(getenv('GSMS_OTP_MAIL_RETRY_DELAY_MS') ?: 350))));
 
 // --- Gemini AI ---
 // Never expose this to browser JavaScript.

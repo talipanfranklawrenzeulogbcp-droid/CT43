@@ -1,0 +1,109 @@
+/* Great Solomon Manpower Services Inc. Core Transaction 4 - single combined JavaScript file */
+document.addEventListener('DOMContentLoaded', () => {
+  const toggle=document.getElementById('sidebarToggle');
+  const sidebar=document.getElementById('sidebar');
+  const backdrop=document.getElementById('sidebar-backdrop');
+  if(toggle&&sidebar){toggle.addEventListener('click',()=>{sidebar.classList.toggle('open');backdrop&&backdrop.classList.toggle('show');});}
+  if(backdrop){backdrop.addEventListener('click',()=>{sidebar?.classList.remove('open');backdrop.classList.remove('show');});}
+  document.addEventListener('keydown',e=>{if(e.key==='Escape'){document.getElementById('modalRoot')?.replaceChildren();sidebar?.classList.remove('open');backdrop?.classList.remove('show');}});
+  document.querySelectorAll('input[type="number"]').forEach(i=>i.addEventListener('wheel',e=>e.preventDefault(),{passive:false}));
+  document.querySelectorAll('form').forEach(form=>form.addEventListener('submit',()=>{const btn=form.querySelector('button[type="submit"],button:not([type])');if(btn){btn.disabled=true;btn.dataset.originalText=btn.innerHTML;btn.innerHTML='<span class="material-symbols-outlined">hourglass_top</span> Processing...';setTimeout(()=>{btn.disabled=false;btn.innerHTML=btn.dataset.originalText||'Submit';},4000);}}));
+});
+function showModal(title,body){const root=document.getElementById('modalRoot');if(!root)return;root.innerHTML=`<div class="gw-modal-backdrop" onclick="if(event.target===this)closeModal()"><div class="gw-modal"><div class="gw-modal-head"><strong>${escapeHtml(title)}</strong><button class="gw-modal-close" onclick="closeModal()"><span class="material-symbols-outlined">close</span></button></div><div class="gw-modal-body"><p style="font-size:12px;line-height:1.7;color:#64748b">${escapeHtml(body)}</p><div style="display:flex;justify-content:flex-end;margin-top:20px"><button class="gw-btn primary" onclick="closeModal()">Continue</button></div></div></div></div>`;}
+function closeModal(){document.getElementById('modalRoot')?.replaceChildren();}
+function escapeHtml(v){return String(v).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));}
+
+function toggleUserMenu(){
+ const m=document.getElementById('userMenu'); if(!m)return;
+ m.classList.toggle('open');
+}
+document.addEventListener('click',e=>{
+ const wrap=document.querySelector('.user-menu-wrap');
+ if(wrap && !wrap.contains(e.target)) document.getElementById('userMenu')?.classList.remove('open');
+});
+function showFeedbackModal(){
+ document.getElementById('userMenu')?.classList.remove('open');
+ const root=document.getElementById('modalRoot'); if(!root)return;
+ const user=window.CURRENT_USER||{name:'User',role:'Staff'};
+ root.innerHTML=`<div class="gw-modal-backdrop" onclick="if(event.target===this)closeModal()"><div class="gw-modal feedback-modal">
+ <div class="gw-modal-head"><div><strong>Send Feedback</strong><small>Help us improve the Great Solomon Manpower Services system.</small></div><button class="gw-modal-close" onclick="closeModal()" aria-label="Close">×</button></div>
+ <div class="gw-modal-body"><div class="feedback-intro"><span class="material-symbols-outlined">rate_review</span><div><strong>Your account details are automatic</strong><p>Your name and role are taken from the account currently signed in.</p></div></div>
+ <form method="post" action="${window.APP_BASE||''}/includes/feedback.php">
+ <div class="feedback-account-grid"><div class="feedback-readonly-field"><label>Name</label><div class="feedback-readonly-value"><span class="material-symbols-outlined">person</span>${escapeHtml(user.name)}</div></div><div class="feedback-readonly-field"><label>Role</label><div class="feedback-readonly-value"><span class="material-symbols-outlined">badge</span>${escapeHtml(user.role)}</div></div></div>
+ <div class="feedback-message-field"><label for="feedbackText">Your Feedback</label><textarea id="feedbackText" name="feedback" rows="7" required maxlength="3000" placeholder="Tell us what worked well, what should be improved, or if you found a problem..."></textarea><div class="feedback-helper">Please avoid including passwords or other sensitive information.</div></div>
+ <div class="record-actions"><button type="button" class="gw-btn secondary" onclick="closeModal()">Cancel</button><button class="gw-btn primary" type="submit"><span class="material-symbols-outlined">send</span>Send Feedback</button></div>
+ </form></div></div></div>`;
+ setTimeout(()=>document.getElementById('feedbackText')?.focus(),50);
+}
+function showTermsModal(){
+ document.getElementById('userMenu')?.classList.remove('open');
+ const root=document.getElementById('modalRoot'); if(!root)return;
+ root.innerHTML=`<div class="gw-modal-backdrop" onclick="if(event.target===this)closeModal()"><div class="gw-modal terms-modal">
+ <div class="gw-modal-head"><div><strong>Terms and Conditions</strong><small>Great Solomon Manpower Services Inc. — Core Transaction 4</small></div><button class="gw-modal-close" onclick="closeModal()" aria-label="Close">×</button></div>
+ <div class="gw-modal-body terms-body">
+ <p>By accessing and using this system, you acknowledge that it is intended only for authorized Great Solomon Manpower Services Inc. administrators and staff. You are responsible for using your assigned account appropriately, keeping your password and verification information confidential, and ensuring that records you create or update are accurate and used only for legitimate company purposes. Sharing accounts, attempting to access another user's account, bypassing access controls, or using the system for unauthorized purposes is prohibited.</p>
+ <p>The system processes personal and, where applicable, sensitive personal information. The company will handle such information in accordance with the <strong>Data Privacy Act of 2012 (Republic Act No. 10173)</strong>, including its principles on transparency, legitimate purpose, proportionality, and appropriate protection of personal information. Users must not disclose, copy, download, or otherwise process personal information beyond what is authorized for their work responsibilities.</p>
+ <p>Users must also use the system and its computer resources responsibly and must not perform unauthorized access, interception, alteration, deletion, disruption, introduction of malicious code, or other prohibited activity. The <strong>Cybercrime Prevention Act of 2012 (Republic Act No. 10175)</strong> addresses offenses involving the confidentiality, integrity, and availability of computer data and systems, and this system's security controls and audit records may be used to support legitimate security and compliance activities.</p>
+ <p>For workplace health and safety records, users must enter and maintain information responsibly and support the company's safety processes. The <strong>Occupational Safety and Health Standards Law (Republic Act No. 11058)</strong> strengthens compliance with occupational safety and health standards and provides duties and protections relating to workplace hazards, safety programs, training, incident reporting, and worker safety. Records in this system should therefore be used only for authorized health, safety, welfare, and compliance purposes.</p>
+ <p>Electronic records, messages, and transactions handled through this system may also be subject to the <strong>Electronic Commerce Act of 2000 (Republic Act No. 8792)</strong> and other applicable Philippine laws and regulations. By continuing to use the system, you agree to follow company policies, applicable laws, and authorized instructions; system activity may be logged for security, audit, operational, and compliance purposes. These terms describe system-use rules and are not a substitute for legal advice; applicable laws and regulations prevail where they conflict with these terms.</p>
+ <div class="terms-note"><span class="material-symbols-outlined">verified_user</span><span>Use the system responsibly and report security, privacy, or data-quality concerns to the appropriate administrator.</span></div>
+ <div class="record-actions"><button type="button" class="gw-btn primary" onclick="closeModal()">I Understand</button></div>
+ </div></div></div>`;
+}
+function showEditUserModal(id,name,email,role){
+ const root=document.getElementById('modalRoot'); if(!root)return;
+ root.innerHTML=`<div class="gw-modal-backdrop" onclick="if(event.target===this)closeModal()"><div class="gw-modal">
+ <div class="gw-modal-head"><strong>Edit User Account</strong><button class="gw-modal-close" onclick="closeModal()">×</button></div>
+ <div class="gw-modal-body"><form method="post" action="${window.location.pathname}">
+ <input type="hidden" name="action" value="edit_user"><input type="hidden" name="id" value="${escapeHtml(id)}">
+ <div class="form-grid edit-user-fields">
+ <div class="full"><label>New Name</label><input class="edit-user-input" name="name" value="${escapeHtml(name)}" required autocomplete="name"></div>
+ <div class="full"><label>New Email</label><input class="edit-user-input" type="email" name="email" value="${escapeHtml(email)}" required autocomplete="email"></div>
+ <div class="full"><label>New Role</label><select class="edit-user-input" name="role" required><option value="Administrator" ${role==="Administrator"?"selected":""}>Administrator</option><option value="Staff" ${role==="Staff"?"selected":""}>Staff</option><option value="Warehouse" ${role==="Warehouse"?"selected":""}>Warehouse</option></select></div>
+ <div class="full"><label>New Password</label><input class="edit-user-input" type="password" name="password" minlength="6" placeholder="Leave blank to keep current password" autocomplete="new-password"></div></div>
+ <div class="record-actions"><button type="button" class="gw-btn secondary" onclick="closeModal()">Cancel</button><button class="gw-btn primary">Save Changes</button></div>
+ </form></div></div></div>`;
+}
+
+/* CT4 Gemini AI Assistant */
+document.addEventListener('DOMContentLoaded',()=>{
+ const form=document.getElementById('aiForm'), input=document.getElementById('aiInput'), messages=document.getElementById('aiMessages');
+ if(!form||!input||!messages)return;
+ const clearBtn=document.getElementById('aiClear');
+ const base=window.APP_BASE||'';
+ let history=[];
+ try{history=JSON.parse(sessionStorage.getItem('ct4_ai_history')||'[]');}catch(e){history=[];}
+ function esc(v){return String(v).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));}
+ function renderText(v){return esc(v).replace(/\n/g,'<br>');}
+ function addMessage(role,text){
+   const row=document.createElement('div'); row.className='ai-message '+(role==='user'?'user':'assistant');
+   row.innerHTML=role==='user'
+    ? '<div class="ai-message-content"><strong>You</strong><p>'+renderText(text)+'</p></div>'
+    : '<div class="ai-msg-icon"><span class="material-symbols-outlined">auto_awesome</span></div><div><strong>CT4 AI</strong><p>'+renderText(text)+'</p></div>';
+   messages.appendChild(row); messages.scrollTop=messages.scrollHeight;
+ }
+ function save(){sessionStorage.setItem('ct4_ai_history',JSON.stringify(history.slice(-8)));}
+ function setBusy(b){input.disabled=b;form.querySelector('button[type="submit"]').disabled=b;}
+ function ask(text){
+   text=(text||'').trim(); if(!text||input.disabled)return;
+   addMessage('user',text);
+   history.push({role:'user',text:text});
+   save(); input.value=''; input.style.height='auto'; setBusy(true);
+   const thinking=document.createElement('div'); thinking.className='ai-message assistant ai-thinking'; thinking.innerHTML='<div class="ai-msg-icon"><span class="material-symbols-outlined">auto_awesome</span></div><div><strong>CT4 AI</strong><p><span class="ai-dots">Thinking…</span></p></div>'; messages.appendChild(thinking); messages.scrollTop=messages.scrollHeight;
+   const fd=new FormData(); fd.append('message',text); fd.append('history',JSON.stringify(history.slice(-8)));
+   fetch(base+'/services/api/gemini.php',{method:'POST',body:fd,credentials:'same-origin',headers:{'X-Requested-With':'XMLHttpRequest'}})
+    .then(r=>r.json().catch(()=>({ok:false,error:'Invalid server response.'})).then(data=>({status:r.status,data})))
+    .then(({data})=>{
+      thinking.remove();
+      if(data.ok){
+        addMessage('assistant',data.answer); history.push({role:'model',text:data.answer}); save();
+      }else addMessage('assistant','I could not answer that right now. '+(data.error||'Please try again.'));
+    }).catch(()=>{thinking.remove();addMessage('assistant','The AI service could not be reached. Please check the server connection and Gemini environment configuration.');})
+    .finally(()=>setBusy(false));
+ }
+ form.addEventListener('submit',e=>{e.preventDefault();ask(input.value);});
+ input.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();ask(input.value);}});
+ input.addEventListener('input',()=>{input.style.height='auto';input.style.height=Math.min(input.scrollHeight,150)+'px';});
+ document.querySelectorAll('.ai-suggestions button').forEach(b=>b.addEventListener('click',()=>ask(b.dataset.prompt||'')));
+ clearBtn?.addEventListener('click',()=>{history=[];sessionStorage.removeItem('ct4_ai_history');messages.innerHTML='<div class="ai-message assistant"><div class="ai-msg-icon"><span class="material-symbols-outlined">auto_awesome</span></div><div><strong>CT4 AI</strong><p>Chat cleared. What would you like to know about Core Transaction 4?</p></div></div>';});
+});

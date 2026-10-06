@@ -235,32 +235,14 @@ function admin_feedback_notifications(): array {
                           FROM admin_notifications n
                           WHERE (n.user_id=? OR n.user_id IS NULL) AND n.type IN ('feedback','feedback_reply','data_transfer')
                           ORDER BY n.created_at DESC,n.id DESC LIMIT 100");
-        $q->execute([(int)$u['id']]);
-        $rows=$q->fetchAll();
-        // Keep the database history intact but expose one bell item per
-        // feedback thread. This also handles installations that previously
-        // created one feedback notification per administrator.
-        $seen=[]; $out=[];
-        foreach($rows as $row){
-            if(($row['type']??'')==='feedback'){
-                $key='thread:'.((int)($row['feedback_thread_id']??0) ?: 'legacy:'.((int)$row['id']));
-                if(isset($seen[$key])) continue;
-                $seen[$key]=true;
-            }
-            $out[]=$row;
-        }
-        return $out;
+        $q->execute([(int)$u['id']]); return $q->fetchAll();
     }catch(Throwable $e){return [];}
 }
 function unread_notification_count(): int {
     try{
         $u=current_user(); if(!$u)return 0;
         if(($u['role']??'')==='Administrator'){
-            $q=db()->prepare("SELECT
-                (SELECT COUNT(*) FROM admin_notifications WHERE is_read=0 AND (user_id=? OR user_id IS NULL) AND type IN ('feedback_reply','data_transfer'))
-                +
-                (SELECT COUNT(DISTINCT COALESCE(feedback_thread_id,id)) FROM admin_notifications WHERE is_read=0 AND (user_id=? OR user_id IS NULL) AND type='feedback')");
-            $q->execute([(int)$u['id'],(int)$u['id']]); return (int)$q->fetchColumn();
+            $q=db()->prepare("SELECT COUNT(*) FROM admin_notifications WHERE is_read=0 AND (user_id=? OR user_id IS NULL) AND type IN ('feedback','feedback_reply','data_transfer')");
         }else{
             $q=db()->prepare("SELECT COUNT(*) FROM admin_notifications WHERE is_read=0 AND (user_id=? OR user_id IS NULL) AND type IN ('data_transfer','feedback_reply')");
         }
@@ -284,43 +266,19 @@ $staffNotifications = (($u['role'] ?? '') === 'Staff') ? staff_transfer_notifica
 ?>
 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title><?=e($title)?> — Great Solomon Manpower Services Inc.</title><link rel="stylesheet" href="<?=e(url('/style.css'))?>"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Public+Sans:wght@400;500;600;700&family=Material+Symbols+Outlined:FILL@0..1&display=swap" rel="stylesheet"></head><body><div id="sidebar-backdrop"></div><aside id="sidebar" class="gw-sidebar"><div class="gw-brand"><div class="brand-logo-white sidebar-logo-wrap"><img src="<?=e(url('/assets/logo2.svg'))?>" alt="Great Solomon Manpower Services Inc. logo" class="brand-logo-image"></div><div class="gw-brand-copy"><div class="gw-brand-title">Great Solomon Manpower Services Inc.</div><div class="gw-brand-subtitle">Governance &amp; Safety</div></div></div><div class="gw-sidebar-section">CORE TRANSACTION 4</div><div style="margin:0 20px 12px;height:1px;background:rgba(255,255,255,.12)"></div><nav class="gw-nav"><a class="module-link" href="<?=e(url('/dashboard.php'))?>"><button class="<?= $section==='dashboard'?'active':'' ?>"><span class="material-symbols-outlined">dashboard</span><span>Reports, Analysis &amp; Dashboard</span></button></a><a class="module-link" href="<?=e(url('/ai_assistant.php'))?>"><button class="<?= $section==='ai'?'active':'' ?>"><span class="material-symbols-outlined">auto_awesome</span><span>AI System Assistant</span><span class="nav-number">AI</span></button></a><a class="module-link" href="<?=e(url('/modules/health_safety/index.php'))?>"><button class="<?= $section==='health'?'active':'' ?>"><span class="material-symbols-outlined">health_and_safety</span><span>Health, Safety &amp; Welfare</span><span class="nav-number">1</span></button></a><a class="module-link" href="<?=e(url('/modules/legal_compliance/index.php'))?>"><button class="<?= $section==='legal'?'active':'' ?>"><span class="material-symbols-outlined">gavel</span><span>Legal &amp; Compliance</span><span class="nav-number">2</span></button></a><?php if (($u['role'] ?? '') === 'Administrator'): ?><a class="module-link" href="<?=e(url('/modules/system_admin_security/index.php'))?>"><button class="<?= $section==='security'?'active':'' ?>"><span class="material-symbols-outlined">admin_panel_settings</span><span>System Administration &amp; Security</span><span class="nav-number">3</span></button></a><?php endif; ?><a class="module-link" href="<?=e(url('/modules/asset_equipment/index.php'))?>"><button class="<?= $section==='assets'?'active':'' ?>"><span class="material-symbols-outlined">inventory_2</span><span>Asset &amp; Equipment Issuance</span><span class="nav-number">4</span></button></a></nav><div class="gw-sidebar-footer"><div class="gw-status-dot"></div><div><strong>Welcome back, <?=e($u['name']??'User')?></strong><span><?=e($u['role']??'Staff')?></span></div></div></aside><div class="gw-shell"><header class="gw-topbar"><div class="gw-topbar-left"><button id="sidebarToggle" class="icon-btn" title="Toggle sidebar"><span class="material-symbols-outlined">menu_open</span></button><div class="gw-topbar-title"><span class="eyebrow">SERVICE MANAGEMENT &amp; ENTERPRISE RESOURCE SYSTEM</span><strong><?=e($title)?></strong></div></div><div class="gw-user user-menu-wrap">
 <?php $topNotificationCount=unread_notification_count(); ?>
+<button type="button" class="gw-notification-trigger" onclick="handleNotificationBell()" aria-label="Open notifications" title="Notifications">
+<span class="material-symbols-outlined">notifications</span><?php if($topNotificationCount>0): ?><span class="top-notification-badge"><?=e($topNotificationCount>99?'99+':$topNotificationCount)?></span><?php endif; ?>
+</button>
 <button type="button" class="gw-user-button" onclick="toggleUserMenu()" aria-expanded="false">
-<?php if($topNotificationCount>0): ?><span class="user-notification-badge" aria-label="<?=e($topNotificationCount)?> unread notification<?= $topNotificationCount===1?'':'s' ?>"><?=e($topNotificationCount>99?'99+':$topNotificationCount)?></span><?php endif; ?>
 <div class="gw-avatar"><?=e(strtoupper(substr((string)($u['name']??'AU'),0,2)))?></div>
 <div class="gw-user-copy"><strong><?=e($u['name']??'Admin User')?></strong><span><?=e($u['role']??'Administrator')?></span></div>
 <span class="material-symbols-outlined user-chevron">expand_more</span>
 </button>
 <div id="userMenu" class="user-dropdown">
-  <div class="user-menu-notifications" id="userMenuNotifications">
-    <div class="user-menu-notifications-head">
-      <div><strong>Notifications</strong><span>Feedback and new data/files</span></div>
-      <?php if($topNotificationCount>0): ?><span class="user-menu-notification-count"><?=e($topNotificationCount>99?'99+':$topNotificationCount)?></span><?php endif; ?>
-    </div>
-    <?php
-      $menuNotes = (($u['role'] ?? '') === 'Administrator') ? $adminNotifications : $staffNotifications;
-      $menuNotes = array_values(array_filter($menuNotes, static function($n){
-          return in_array((string)($n['type']??''), ['feedback','feedback_reply','data_transfer','file_release','file_request'], true);
-      }));
-      foreach(array_slice($menuNotes,0,5) as $n):
-        $nt=(string)($n['type']??'');
-        $icon=in_array($nt,['feedback','feedback_reply'],true)?'feedback':(in_array($nt,['file_release','file_request'],true)?'folder_open':'sync');
-        $label=in_array($nt,['feedback','feedback_reply'],true)?'Feedback':'Data / File Tracking';
-    ?>
-      <button type="button" class="user-menu-notification-item <?=((int)($n['is_read']??0)===0?'unread':'')?>" onclick="showNotificationModal()">
-        <span class="user-menu-notification-icon"><span class="material-symbols-outlined"><?=e($icon)?></span></span>
-        <span class="user-menu-notification-copy"><strong><?=e((string)($n['title']??$label))?></strong><small><?=e($label)?> · <?=e((string)($n['message']??''))?></small></span>
-        <?php if((int)($n['is_read']??0)===0): ?><span class="user-menu-notification-dot" aria-label="Unread"></span><?php endif; ?>
-      </button>
-    <?php endforeach; ?>
-    <?php if(!$menuNotes): ?><div class="user-menu-notifications-empty"><span class="material-symbols-outlined">notifications_none</span><span>No feedback or new data/files.</span></div><?php endif; ?>
-    <?php if($menuNotes): ?><button type="button" class="user-menu-notifications-view" onclick="showNotificationModal()">View all notifications</button><?php endif; ?>
-  </div>
-  <div class="user-menu-divider"></div>
-  <button type="button" onclick="showDataStorageModal()"><span class="material-symbols-outlined">folder_data</span>Data Storage</button>
-  <button type="button" onclick="showArchiveModal()"><span class="material-symbols-outlined">archive</span>Archive</button>
-<?php if (($u['role'] ?? '') === 'Administrator'): ?><button type="button" onclick="showAdminFeedbackModal()"><span class="material-symbols-outlined">feedback</span>Employee Feedback</button><?php elseif (($u['role'] ?? '') === 'Staff'): ?><button type="button" onclick="showFeedbackModal()"><span class="material-symbols-outlined">feedback</span>Feedback</button><?php endif; ?>
-  <button type="button" onclick="showTermsModal()"><span class="material-symbols-outlined">gavel</span>Terms and Conditions</button>
-  <button type="button" onclick="showLogoutModal()"><span class="material-symbols-outlined">logout</span>Logout</button>
+<button type="button" onclick="showDataStorageModal()"><span class="material-symbols-outlined">folder_data</span>Data Storage</button><button type="button" onclick="showArchiveModal()"><span class="material-symbols-outlined">archive</span>Archive</button>
+<?php if (($u['role'] ?? '') === 'Staff'): ?><button type="button" onclick="showFeedbackModal()"><span class="material-symbols-outlined">feedback</span>Feedback</button><?php endif; ?>
+<button type="button" onclick="showTermsModal()"><span class="material-symbols-outlined">gavel</span>Terms and Conditions</button>
+<button type="button" onclick="showLogoutModal()"><span class="material-symbols-outlined">logout</span>Logout</button>
 </div>
 </div></header><main class="gw-main"><div class="page-shell">
 <?php }

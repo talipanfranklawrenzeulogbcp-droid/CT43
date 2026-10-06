@@ -3,13 +3,16 @@ FROM php:8.3-apache
 # Install the native libraries and PHP extensions used by the application.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
-        ca-certificates \
         libcurl4-openssl-dev \
+        libfreetype6-dev \
+        libjpeg62-turbo-dev \
         libonig-dev \
         libpng-dev \
         libzip-dev \
+    && docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-install -j"$(nproc)" \
         curl \
+        gd \
         mbstring \
         opcache \
         pdo_mysql \
@@ -57,11 +60,11 @@ COPY . .
 RUN mkdir -p storage/logs storage/exports storage/reports \
     && chown -R www-data:www-data storage \
     && chmod -R 0755 storage \
-    && if [ -f .env ]; then chmod 0600 .env; fi
+    && rm -f .env
 
 EXPOSE 8080
 
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=5 \
     CMD php -r '$p=(int)(getenv("PORT")?:8080); $c=@file_get_contents("http://127.0.0.1:".$p."/health.php"); if($c===false) exit(1); $j=json_decode($c,true); exit(($j["status"]??"") === "ok" ? 0 : 1);'
 
 ENV PORT=8080

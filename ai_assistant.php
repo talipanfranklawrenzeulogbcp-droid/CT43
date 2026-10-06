@@ -33,7 +33,7 @@ page_header('AI System Assistant','ai'); ?>
 
     <div class="ai-security-card">
       <span class="material-symbols-outlined">verified_user</span>
-      <div><strong>Protected context</strong><p>Passwords, biometric authentication data, API keys, and other secrets are excluded from AI context.</p></div>
+      <div><strong>Protected context</strong><p>Passwords, OTPs, API keys, and other secrets are excluded from AI context.</p></div>
     </div>
   </aside>
 

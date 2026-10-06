@@ -76,37 +76,13 @@ final class AssetEquipmentService {
     /** @return array{0:?string,1:?string,2:?string,3:int,4:?string} */
     private function validatedImage(mixed $file): array {
         if(!is_array($file) || !isset($file['error']) || (int)$file['error']===UPLOAD_ERR_NO_FILE) return [null,null,null,0,null];
-        $uploadError=(int)($file['error']??UPLOAD_ERR_NO_FILE);
-        if($uploadError!==UPLOAD_ERR_OK){
-            $errors=[
-                UPLOAD_ERR_INI_SIZE=>'The selected picture is larger than the server upload limit.',
-                UPLOAD_ERR_FORM_SIZE=>'The selected picture is larger than the allowed form size.',
-                UPLOAD_ERR_PARTIAL=>'The picture upload was interrupted. Please try again.',
-                UPLOAD_ERR_NO_TMP_DIR=>'The server upload folder is unavailable.',
-                UPLOAD_ERR_CANT_WRITE=>'The server could not save the uploaded picture.',
-                UPLOAD_ERR_EXTENSION=>'The server stopped the picture upload.'
-            ];
-            throw new RuntimeException($errors[$uploadError]??'Asset picture upload failed.');
-        }
+        if((int)$file['error']!==UPLOAD_ERR_OK) throw new RuntimeException('Asset picture upload failed.');
         $size=(int)($file['size']??0); if($size<=0 || $size>5*1024*1024) throw new RuntimeException('Asset picture must be between 1 byte and 5 MB.');
-        $tmp=(string)($file['tmp_name']??'');
-        if($tmp==='' || !is_file($tmp) || !is_readable($tmp)) throw new RuntimeException('The uploaded picture could not be read by the server.');
-        // Validate the multipart error, readable temporary file, image structure,
-        // server-detected MIME type and dimensions. Avoid is_uploaded_file()
-        // because valid uploads can pass through reverse proxies/container
-        // setups where PHP cannot identify the temporary file as native.
-        $info=@getimagesize($tmp);
-        if($info===false) throw new RuntimeException('The asset picture must be a valid image.');
-        $mime=(string)($info['mime']??'');
-        $allowed=['image/jpeg','image/png','image/webp','image/gif'];
-        if(!in_array($mime,$allowed,true)) throw new RuntimeException('Allowed asset picture types are JPG, PNG, WEBP, and GIF.');
-        $width=(int)($info[0]??0); $height=(int)($info[1]??0);
-        if($width<1 || $height<1 || $width>10000 || $height>10000) throw new RuntimeException('The asset picture dimensions are not supported.');
-        $data=@file_get_contents($tmp); if($data===false || $data==='') throw new RuntimeException('Unable to read the asset picture.');
-        if(strlen($data)>5*1024*1024) throw new RuntimeException('Asset picture must not exceed 5 MB.');
-        $name=trim((string)($file['name']??'asset-picture'));
-        $name=preg_replace('/[\x00-\x1F\x7F]+/',' ',$name) ?: 'asset-picture';
-        $name=function_exists('mb_substr')?mb_substr($name,0,255):substr($name,0,255);
-        return [$data,$name,$mime,strlen($data),hash('sha256',$data)];
+        $tmp=(string)($file['tmp_name']??''); if($tmp==='' || !is_uploaded_file($tmp)) throw new RuntimeException('Invalid asset picture upload.');
+        $info=@getimagesize($tmp); if($info===false) throw new RuntimeException('The asset picture must be a valid image.');
+        $mime=(string)($info['mime']??''); if(!in_array($mime,['image/jpeg','image/png','image/webp','image/gif'],true)) throw new RuntimeException('Allowed asset picture types are JPG, PNG, WEBP, and GIF.');
+        $data=file_get_contents($tmp); if($data===false) throw new RuntimeException('Unable to read the asset picture.');
+        $name=trim((string)($file['name']??'asset-picture')); $name=function_exists('mb_substr')?mb_substr($name,0,255):substr($name,0,255);
+        return [$data,$name,$mime,$size,hash('sha256',$data)];
     }
 }

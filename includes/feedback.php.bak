@@ -1,0 +1,17 @@
+<?php
+require_once __DIR__.'/helpers.php';
+require_once __DIR__.'/mailer.php';
+require_login();
+if($_SERVER['REQUEST_METHOD']!=='POST'){ redirect('/dashboard.php'); }
+$u=current_user();
+$name=trim((string)($u['name']??'')); $role=trim((string)($u['role']??'')); $feedback=trim((string)($_POST['feedback']??''));
+if($name===''||$role===''||$feedback===''){ flash('error','Please complete your name, role and feedback.'); redirect('/dashboard.php'); }
+try {
+    $stmt=db()->query("SELECT email FROM users WHERE role='Administrator' AND active=1 ORDER BY id LIMIT 1");
+    $admin=$stmt->fetchColumn();
+    if(!$admin) throw new RuntimeException('No active administrator email is configured.');
+    send_feedback_email($admin,$name,$role,$feedback);
+    audit('System Administration & Security','Submit Feedback',$name.' ('.$role.')');
+    flash('success','Feedback sent successfully to the administrator.');
+} catch(Throwable $e){ flash('error','Unable to send feedback: '.$e->getMessage()); }
+redirect($_SERVER['HTTP_REFERER']??'/dashboard.php');

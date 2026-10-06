@@ -1,78 +1,178 @@
 <?php
-declare(strict_types=1);
 require_once __DIR__.'/../includes/helpers.php';
-require_once __DIR__.'/../includes/webauthn.php';
+require_once __DIR__.'/../includes/mailer.php';
 
 if (current_user()) redirect('/dashboard.php');
 
 $error='';
 $success='';
+$pending=$_SESSION['pending_otp_user']??null;
+// Keep the pending-login session alive slightly longer than one OTP lifetime.
+// An expired OTP can still be resent without forcing the user through password
+// authentication again, while abandoned pending sessions are eventually cleared.
+$pendingCreated=(int)($_SESSION['pending_otp_created'] ?? 0);
+if ($pending && (!$pendingCreated || (time() - $pendingCreated) > (OTP_PENDING_SESSION_MINUTES * 60))) {
+    unset($_SESSION['pending_otp_user'], $_SESSION['pending_otp_created'], $_SESSION['otp_last_resend']);
+    $pending=null;
+}
 
 if ($_SERVER['REQUEST_METHOD']==='POST') {
     verify_csrf();
     try {
-        $action=(string)($_POST['action']??'login');
-        if ($action!=='login') throw new RuntimeException('Invalid sign-in request.');
+        $action=$_POST['action']??'login';
 
-        $email=strtolower(trim((string)($_POST['email']??'')));
-        $password=(string)($_POST['password']??'');
-        $terms=(string)($_POST['terms_accepted']??'0');
+        if ($action==='verify_otp' && $pending) {
+            $code=preg_replace('/\D/','',$_POST['otp']??'');
+            $stmt=db()->prepare('SELECT id,otp_hash,expires_at,attempts FROM otp_requests WHERE user_id=? ORDER BY id DESC LIMIT 1');
+            $stmt->execute([(int)$pending['id']]);
+            $row=$stmt->fetch();
 
-        if ($terms!=='1') throw new RuntimeException('Please confirm the Terms and Conditions before signing in.');
-        if (!filter_var($email,FILTER_VALIDATE_EMAIL) || $password==='') throw new RuntimeException('Please enter a valid email address and password.');
+            if ($row && !isset($row['otp_hash'],$row['expires_at'],$row['attempts'])) {
+                $row=null;
+            }
 
-        $stmt=db()->prepare('SELECT id,name,email,password_hash,role,active,face_id_credential_id FROM users WHERE email=? LIMIT 1');
-        $stmt->execute([$email]);
-        $u=$stmt->fetch();
+            if (!$row) {
+                $error='Your verification code is no longer available. Please sign in again.';
+                unset($_SESSION['pending_otp_user'],$_SESSION['pending_otp_created']);
+                $pending=null;
+            } elseif (strtotime($row['expires_at']) < time()) {
+                // Keep the pending-login session so the existing Resend action
+                // remains usable after an OTP expires.
+                $error='Your verification code has expired. Request a new code to continue.';
+                db()->prepare('DELETE FROM otp_requests WHERE id=?')->execute([(int)$row['id']]);
+            } elseif ((int)$row['attempts'] >= OTP_MAX_ATTEMPTS) {
+                $error='Too many incorrect attempts. Please sign in again.';
+            } elseif (!preg_match('/^\d{6}$/',$code) || !password_verify($code,$row['otp_hash'])) {
+                db()->prepare('UPDATE otp_requests SET attempts=attempts+1 WHERE id=?')->execute([(int)$row['id']]);
+                $error='Incorrect verification code.';
+            } else {
+                login_user($pending);
+                db()->prepare('DELETE FROM otp_requests WHERE user_id=?')->execute([(int)$pending['id']]);
+                unset($_SESSION['pending_otp_user'],$_SESSION['pending_otp_created']);
 
-        if (!$u || !(int)$u['active'] || !password_verify($password,(string)$u['password_hash'])) {
-            $history=db()->prepare('INSERT INTO login_history(user_id,email,status,ip_address,user_agent) VALUES(?,?,?,?,?)');
-            $history->execute([$u?(int)$u['id']:null,$email,'Failed',$_SERVER['REMOTE_ADDR']??'Unknown',substr($_SERVER['HTTP_USER_AGENT']??'',0,500)]);
-            throw new RuntimeException('Invalid email or password.');
-        }
+                $history=db()->prepare('INSERT INTO login_history(user_id,email,status,ip_address,user_agent) VALUES(?,?,?,?,?)');
+                $history->execute([
+                    (int)$pending['id'],$pending['email'],'Success',
+                    $_SERVER['REMOTE_ADDR']??'Unknown',
+                    substr($_SERVER['HTTP_USER_AGENT']??'',0,500)
+                ]);
+                audit('System Administration & Security','Two-Step Login','Successful password and OTP verification');
+                redirect('/dashboard.php');
+            }
+        } elseif ($action==='resend_otp' && $pending) {
+            $lastResend=(int)($_SESSION['otp_last_resend'] ?? 0);
+            $cooldown=OTP_RESEND_COOLDOWN_SECONDS;
+            if($lastResend && (time()-$lastResend)<$cooldown){
+                $remaining=max(1,$cooldown-(time()-$lastResend));
+                throw new RuntimeException('Please wait '.$remaining.' seconds before requesting another verification code.');
+            }
 
-        $isPrimaryAdmin = strtolower((string)$u['email']) === 'adminct4@gmail.com' && (string)$u['role'] === 'Administrator';
+            $otp=(string)random_int(100000,999999);
+            $hash=password_hash($otp,PASSWORD_DEFAULT);
+            if ($hash === false) {
+                throw new RuntimeException('Unable to prepare the verification code. Please try again.');
+            }
+            $expires=date('Y-m-d H:i:s',time()+(OTP_EXPIRY_MINUTES*60));
 
-        if ($isPrimaryAdmin) {
-            login_user($u);
-            $history=db()->prepare('INSERT INTO login_history(user_id,email,status,ip_address,user_agent) VALUES(?,?,?,?,?)');
-            $history->execute([(int)$u['id'],$u['email'],'Success',$_SERVER['REMOTE_ADDR']??'Unknown',substr($_SERVER['HTTP_USER_AGENT']??'',0,500)]);
-            audit('System Administration & Security','Administrator Login','Primary administrator password login bypassed Face ID verification');
-            redirect('/dashboard.php');
-        }
+            // Deliver the new code before replacing the currently usable code.
+            // If SMTP fails, the existing OTP remains available instead of
+            // leaving the user with no working verification code.
+            try {
+                send_otp_email($pending['email'],$pending['name'],$otp);
 
-        $designated=(string)($u['face_id_credential_id']??'');
-        if ($designated==='') {
-            $cred=db()->prepare('SELECT credential_id FROM webauthn_credentials WHERE user_id=? ORDER BY id');
-            $cred->execute([(int)$u['id']]);
-            $credentials=$cred->fetchAll(PDO::FETCH_COLUMN);
+                $pdo=db();
+                $pdo->beginTransaction();
+                try {
+                    $pdo->prepare('DELETE FROM otp_requests WHERE user_id=?')->execute([(int)$pending['id']]);
+                    $pdo->prepare('INSERT INTO otp_requests(user_id,otp_hash,expires_at,attempts) VALUES(?,?,?,0)')
+                        ->execute([(int)$pending['id'],$hash,$expires]);
+                    $pdo->commit();
+                } catch(Throwable $dbError) {
+                    if ($pdo->inTransaction()) $pdo->rollBack();
+                    throw $dbError;
+                }
 
-            if (count($credentials)===1) {
-                $designated=(string)$credentials[0];
-                db()->prepare('UPDATE users SET face_id_credential_id=? WHERE id=? AND (face_id_credential_id IS NULL OR face_id_credential_id=\'\')')
-                    ->execute([$designated,(int)$u['id']]);
+                // Start the cooldown only after a successful delivery and DB update.
+                $_SESSION['otp_last_resend']=time();
+                $_SESSION['pending_otp_created']=time();
+                $pending=$_SESSION['pending_otp_user'];
+                $success='A new 6-digit verification code has been sent to your email.';
+            } catch(Throwable $mailError) {
+                $error='Unable to send verification code. Your previous code is still available. Check the Gmail SMTP/App Password settings and try again.';
+            }
+        } elseif ($action==='login') {
+            $email=strtolower(trim((string)($_POST['email']??'')));
+            $password=(string)($_POST['password']??'');
+            if (($_POST['terms_accepted'] ?? '') !== '1') {
+                throw new RuntimeException('Please read the Terms and Conditions, tick the acceptance checkbox, and confirm before signing in.');
+            }
+
+            // Basic brute-force protection: five failed password attempts for the
+            // same email/IP within 15 minutes requires waiting before another try.
+            $ip=(string)($_SERVER['REMOTE_ADDR']??'Unknown');
+            $rate=db()->prepare("SELECT COUNT(*) FROM login_history WHERE status='Failed' AND email=? AND ip_address=? AND login_at >= DATE_SUB(NOW(), INTERVAL 15 MINUTE)");
+            $rate->execute([$email,$ip]);
+            if((int)$rate->fetchColumn() >= 5){
+                throw new RuntimeException('Too many failed sign-in attempts. Please wait 15 minutes and try again.');
+            }
+
+            $stmt=db()->prepare('SELECT id,name,email,role,password_hash FROM users WHERE LOWER(email)=? AND active=1 LIMIT 1');
+            $stmt->execute([$email]);
+            $u=$stmt->fetch();
+
+            if ($u && password_verify($password,$u['password_hash'])) {
+                $otp=(string)random_int(100000,999999);
+                $otpHash=password_hash($otp,PASSWORD_DEFAULT);
+                if($otpHash===false) throw new RuntimeException('Unable to prepare the verification code.');
+                $expires=date('Y-m-d H:i:s',time()+(OTP_EXPIRY_MINUTES*60));
+
+                try {
+                    // Delivery must succeed before replacing the user's current
+                    // database OTP. This prevents a temporary SMTP outage from
+                    // destroying a still-usable verification code.
+                    send_otp_email($u['email'],$u['name'],$otp);
+
+                    $pdo=db();
+                    $pdo->beginTransaction();
+                    try {
+                        $pdo->prepare('DELETE FROM otp_requests WHERE user_id=?')->execute([(int)$u['id']]);
+                        $pdo->prepare('INSERT INTO otp_requests(user_id,otp_hash,expires_at,attempts) VALUES(?,?,?,0)')
+                            ->execute([(int)$u['id'],$otpHash,$expires]);
+                        $pdo->commit();
+                    } catch(Throwable $dbError) {
+                        if($pdo->inTransaction()) $pdo->rollBack();
+                        throw $dbError;
+                    }
+                    $_SESSION['pending_otp_user']=[
+                        'id'=>(int)$u['id'],'name'=>$u['name'],
+                        'email'=>$u['email'],'role'=>$u['role']
+                    ];
+                    $_SESSION['pending_otp_created']=time();
+                    $_SESSION['otp_last_resend']=time();
+                    $pending=$_SESSION['pending_otp_user'];
+                    $success='Verification code sent. Enter the 6-digit OTP below to continue to the dashboard.';
+
+                    $history=db()->prepare('INSERT INTO login_history(user_id,email,status,ip_address,user_agent) VALUES(?,?,?,?,?)');
+                    $history->execute([
+                        (int)$u['id'],$email,'OTP Pending',
+                        $_SERVER['REMOTE_ADDR']??'Unknown',
+                        substr($_SERVER['HTTP_USER_AGENT']??'',0,500)
+                    ]);
+                } catch(Throwable $mailError) {
+                    $error='We could not send the verification code. Please verify the Gmail SMTP/App Password configuration and try again.';
+                }
+            } else {
+                $error='Invalid email or password.';
+                $history=db()->prepare('INSERT INTO login_history(user_id,email,status,ip_address,user_agent) VALUES(?,?,?,?,?)');
+                $history->execute([
+                    $u ? (int)$u['id'] : null,$email,'Failed',
+                    $_SERVER['REMOTE_ADDR']??'Unknown',
+                    substr($_SERVER['HTTP_USER_AGENT']??'',0,500)
+                ]);
             }
         }
-
-        if ($designated==='') {
-            throw new RuntimeException('This account has no registered Face ID. Ask an administrator to register the account Face ID before signing in.');
-        }
-
-        $check=db()->prepare('SELECT id FROM webauthn_credentials WHERE user_id=? AND credential_id=? LIMIT 1');
-        $check->execute([(int)$u['id'],$designated]);
-        if(!$check->fetchColumn()) {
-            throw new RuntimeException('The registered Face ID is no longer available. Ask an administrator to register a new Face ID before signing in.');
-        }
-
-        $_SESSION['pending_biometric_user']=[
-            'id'=>(int)$u['id'],'name'=>(string)$u['name'],'email'=>(string)$u['email'],'role'=>(string)$u['role']
-        ];
-        $_SESSION['pending_face_id_credential']=$designated;
-        $_SESSION['pending_biometric_created']=time();
-        unset($_SESSION['biometric_enroll_existing']);
-        redirect('/auth/biometric.php');
     } catch(Throwable $e) {
-        $error=$e->getMessage();
+        $error='Unable to process the request. Check the database and Gmail settings.';
     }
 }
 ?>
@@ -81,59 +181,93 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Sign In — Great Solomon Manpower Services Inc.</title>
+<title><?= $pending ? 'Enter OTP' : 'Sign In' ?> — Great Solomon Manpower Services Inc.</title>
 <link rel="stylesheet" href="../style.css">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&family=Material+Symbols+Outlined:FILL@0..1&display=swap" rel="stylesheet">
 </head>
 <body class="auth-body">
 <div class="login-page">
-  <div class="login-card auth-card">
+  <div class="login-card auth-card <?= $pending ? 'otp-card' : '' ?>">
     <div class="brand-mark auth-brand">
       <div class="brand-logo-white auth-logo-wrap"><img src="../assets/logo2.svg" alt="Great Solomon Manpower Services Inc. logo" class="brand-logo-image"></div>
       <div class="auth-brand-copy"><strong>Great Solomon Manpower Services Inc.</strong><div class="small-muted">Core Transaction 4</div></div>
     </div>
 
-    <div class="auth-heading">
-      <span class="material-symbols-outlined">lock</span>
-      <h1>Welcome Back</h1>
-      <p>Sign in to access Governance, Safety &amp; System Administration.</p>
-    </div>
-    <?php if($error):?><div class="notice error auth-error"><?=e($error)?></div><?php endif;?>
+    <?php if($pending): ?>
+      <div class="auth-heading">
+        <span class="material-symbols-outlined">shield_lock</span>
+        <h1>Enter OTP</h1>
+        <p>Login successful. Enter the <strong>6-digit OTP</strong> sent to <strong><?=e($pending['email'])?></strong> to continue to the dashboard.</p>
+      </div>
+      <?php if($error):?><div class="notice error auth-error"><?=e($error)?></div><?php endif;?>
+      <?php if($success):?><div class="notice success auth-error"><?=e($success)?></div><?php endif;?>
 
-    <form method="post" class="auth-form" id="loginForm"><?=csrf_field()?>
-      <input type="hidden" name="action" value="login">
-      <input type="hidden" name="terms_accepted" id="termsAccepted" value="0">
-      <div class="field"><label>Email Address</label><input type="email" name="email" autocomplete="username" required value="<?=e($_POST['email']??'')?>"></div>
-      <div class="field"><label>Password</label><input type="password" name="password" autocomplete="current-password" required></div>
-
-      <details class="auth-terms" id="loginTerms">
-        <summary><span>Terms and Conditions</span><span class="material-symbols-outlined" aria-hidden="true">expand_more</span></summary>
-        <div class="auth-terms-body">
-          <p>By accessing and using this system, you acknowledge that it is intended only for authorized Great Solomon Manpower Services Inc. administrators and staff. Use your assigned account appropriately, keep authentication information confidential, and ensure records you create or update are accurate and used only for legitimate company purposes.</p>
-          <p>The system may process personal and sensitive personal information. Such information must be handled only as authorized for your work responsibilities and in accordance with applicable company policies and Philippine data-protection requirements.</p>
-          <p>Unauthorized access, account sharing, bypassing security controls, misuse of records, disruption, malicious code, or other prohibited activity is not permitted. System activity may be logged for legitimate security, audit, operational, and compliance purposes.</p>
-          <p>Health, safety, welfare, recruitment, employment, and legal-compliance records must be used only for authorized business purposes. Applicable laws and regulations prevail where these terms conflict with a legal requirement.</p>
-          <div class="auth-terms-accept">
-            <label class="auth-checkbox">
-              <input type="checkbox" id="termsCheckbox" required>
-              <span>I have read and agree to the Terms and Conditions.</span>
-            </label>
-            <button type="button" class="gw-btn secondary auth-terms-confirm" id="confirmTerms" disabled>
-              <span class="material-symbols-outlined">check_circle</span> Confirm Terms
-            </button>
-          </div>
+      <form method="post" class="auth-form"><?=csrf_field()?>
+        <input type="hidden" name="action" value="verify_otp">
+        <div class="field otp-field">
+          <label for="otp">One-Time Password</label>
+          <input id="otp" class="otp-input" type="text" name="otp" inputmode="numeric"
+                 pattern="\d{6}" maxlength="6" autocomplete="one-time-code"
+                 placeholder="000000" required autofocus>
         </div>
-      </details>
+        <button class="gw-btn primary auth-submit" type="submit">
+          <span class="material-symbols-outlined">verified</span> Verify &amp; Open Dashboard
+        </button>
+      </form>
 
-      <button class="gw-btn primary auth-submit" type="submit" id="loginSubmit" disabled>
-        <span class="material-symbols-outlined">login</span> Sign In
-      </button>
-    </form>
+      <form method="post" class="resend-form" id="resendForm"><?=csrf_field()?>
+        <input type="hidden" name="action" value="resend_otp">
+        <button type="submit" class="auth-link" id="resendButton" data-cooldown="<?=OTP_RESEND_COOLDOWN_SECONDS?>">Resend verification code</button>
+      </form>
+      <a class="auth-link secondary" href="../auth/logout.php">Use a different account</a>
+      <div class="auth-security-note">
+        <span class="material-symbols-outlined">schedule</span>
+        The code expires in <?=OTP_EXPIRY_MINUTES?> minutes
+      </div>
 
-    <div class="auth-security-note">
-      <span class="material-symbols-outlined">face</span>
-      Password verification is followed by the Face ID already registered for this account.
-    </div>
+    <?php else: ?>
+      <div class="auth-heading">
+        <span class="material-symbols-outlined">lock</span>
+        <h1>Welcome Back</h1>
+        <p>Sign in to access Governance, Safety &amp; System Administration.</p>
+      </div>
+      <?php if($error):?><div class="notice error auth-error"><?=e($error)?></div><?php endif;?>
+      <?php if($success):?><div class="notice success auth-error"><?=e($success)?></div><?php endif;?>
+
+      <form method="post" class="auth-form" id="loginForm"><?=csrf_field()?>
+        <input type="hidden" name="action" value="login">
+        <input type="hidden" name="terms_accepted" id="termsAccepted" value="0">
+        <div class="field"><label>Email Address</label><input type="email" name="email" autocomplete="username" required value="<?=e($_POST['email']??'')?>"></div>
+        <div class="field"><label>Password</label><input type="password" name="password" autocomplete="current-password" required></div>
+
+        <details class="auth-terms" id="loginTerms">
+          <summary><span>Terms and Conditions</span><span class="material-symbols-outlined" aria-hidden="true">expand_more</span></summary>
+          <div class="auth-terms-body">
+            <p>By accessing and using this system, you acknowledge that it is intended only for authorized Great Solomon Manpower Services Inc. administrators and staff. Use your assigned account appropriately, keep authentication information confidential, and ensure records you create or update are accurate and used only for legitimate company purposes.</p>
+            <p>The system may process personal and sensitive personal information. Such information must be handled only as authorized for your work responsibilities and in accordance with applicable company policies and Philippine data-protection requirements.</p>
+            <p>Unauthorized access, account sharing, bypassing security controls, misuse of records, disruption, malicious code, or other prohibited activity is not permitted. System activity may be logged for legitimate security, audit, operational, and compliance purposes.</p>
+            <p>Health, safety, welfare, recruitment, employment, and legal-compliance records must be used only for authorized business purposes. Applicable laws and regulations prevail where these terms conflict with a legal requirement.</p>
+            <div class="auth-terms-accept">
+              <label class="auth-checkbox">
+                <input type="checkbox" id="termsCheckbox" required>
+                <span>I have read and agree to the Terms and Conditions.</span>
+              </label>
+              <button type="button" class="gw-btn secondary auth-terms-confirm" id="confirmTerms" disabled>
+                <span class="material-symbols-outlined">check_circle</span> Confirm Terms
+              </button>
+            </div>
+          </div>
+        </details>
+
+        <button class="gw-btn primary auth-submit" type="submit" id="loginSubmit" disabled>
+          <span class="material-symbols-outlined">login</span> Sign In
+        </button>
+      </form>
+      <div class="auth-security-note">
+        <span class="material-symbols-outlined">verified_user</span>
+        After login, a 6-digit OTP is required before the dashboard opens.
+      </div>
+    <?php endif; ?>
   </div>
 </div>
 <script>
@@ -156,6 +290,28 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
   document.getElementById('loginForm')?.addEventListener('submit',e=>{
     if(accepted.value!=='1'){e.preventDefault();terms.open=true;checkbox.focus();}
   });
+
+  // Prevent accidental double-clicks on resend without changing the existing UI.
+  const resendForm=document.getElementById('resendForm');
+  const resendButton=document.getElementById('resendButton');
+  if(resendForm && resendButton){
+    resendForm.addEventListener('submit',()=>{
+      resendButton.disabled=true;
+      const original=resendButton.textContent;
+      let remaining=parseInt(resendButton.dataset.cooldown||'15',10);
+      const tick=()=>{
+        if(remaining>0){
+          resendButton.textContent=original+' ('+remaining+'s)';
+          remaining-=1;
+          window.setTimeout(tick,1000);
+        } else {
+          resendButton.textContent=original;
+          resendButton.disabled=false;
+        }
+      };
+      tick();
+    });
+  }
 })();
 </script>
 <script src="../app.js"></script>

@@ -3,9 +3,9 @@ require_once __DIR__.'/../../includes/helpers.php'; require_once __DIR__.'/../..
 if($_SERVER['REQUEST_METHOD']==='POST'){ verify_csrf();try{$message=$svc->handle((string)($_POST['action']??''),$_POST,current_user());flash('success',$message);}catch(Throwable $e){flash('error','Unable to save record: '.$e->getMessage());}redirect('/modules/asset_equipment/index.php');}
 $assets=$svc->assets(); $issuances=$svc->issuances();
 $u=current_user();
-page_header('Asset & Equipment Issuance Tracker','assets');show_flash();?>
-<div class="gw-breadcrumb"><span>Great Solomon Manpower Services Inc.</span><span>/</span><strong>Asset &amp; Equipment Issuance Tracker</strong></div>
-<section class="gw-hero module-hero"><div><div class="eyebrow">MODULE 4</div><h1>Asset &amp; Equipment Issuance Tracker</h1><p>Track equipment inventory, items available for borrowing, issuance, and returns.</p></div></section>
+page_header('Asset & Equipment Issuance','assets');show_flash();?>
+<div class="gw-breadcrumb"><span>Great Solomon Manpower Services Inc.</span><span>/</span><strong>Asset &amp; Equipment Issuance</strong></div>
+<section class="gw-hero"><div><div class="eyebrow">MODULE 4</div><h1>Asset &amp; Equipment Issuance Tracker</h1><p>Track equipment inventory, items available for borrowing, issuance, and returns.</p></div></section>
 
 <section class="gw-quick-actions">
   <a href="#available-items"><span class="material-symbols-outlined">inventory_2</span> Items to Borrow</a>
@@ -83,7 +83,7 @@ page_header('Asset & Equipment Issuance Tracker','assets');show_flash();?>
               <input type="hidden" name="action" value="update_asset_picture">
               <input type="hidden" name="asset_id" value="<?= (int)$a['id'] ?>">
               <label class="gw-btn ghost" style="padding:4px 8px;font-size:11px;cursor:pointer;display:inline-block">
-                <?=!empty($a['image_data'])?'Change Picture':'Add Picture'?><input type="file" name="asset_image" accept="image/jpeg,image/png,image/webp,image/gif" style="display:none" onchange="submitAssetPicture(this)">
+                <?=!empty($a['image_data'])?'Change Picture':'Add Picture'?><input type="file" name="asset_image" accept="image/jpeg,image/png,image/webp,image/gif" style="display:none" onchange="this.form.submit()">
               </label>
             </form>
           </td>
@@ -116,7 +116,7 @@ page_header('Asset & Equipment Issuance Tracker','assets');show_flash();?>
       <div><label>Expected Return</label><input type="date" name="expected_return"></div>
       <div class="full"><label>Notes / Purpose</label><textarea name="notes" placeholder="Purpose or condition details..."></textarea></div>
     </div>
-    <div class="record-actions"><button class="gw-btn primary">Issue Equipment</button></div>
+    <div class="record-actions"><button type="submit" class="gw-btn primary">Issue Equipment</button></div>
   </form>
 </section>
 
@@ -137,7 +137,7 @@ page_header('Asset & Equipment Issuance Tracker','assets');show_flash();?>
       <div><label>Asset Picture</label><input type="file" name="asset_image" accept="image/jpeg,image/png,image/webp,image/gif"><small style="display:block;color:#64748b;margin-top:5px">Optional. JPG, PNG, WEBP or GIF, up to 5 MB.</small></div>
     </div>
     <div class="record-actions">
-      <button class="gw-btn secondary">Register Item</button>
+      <button type="submit" class="gw-btn secondary">Register Item</button>
     </div>
   </form>
 </section>
@@ -184,7 +184,7 @@ function showAssetPicture(assetId, assetName) {
   const root = document.getElementById('modalRoot');
   if (!root) return;
   const src = <?=json_encode(url('/modules/asset_equipment/asset_image.php'))?> + '?id=' + encodeURIComponent(String(assetId));
-  root.innerHTML = `<div class="gw-modal-backdrop" onclick="if(event.target===this)closeModal()"><div class="gw-modal" style="width:min(900px,100%)"><div class="gw-modal-head"><div><strong>${escapeHtml(assetName || 'Asset Picture')}</strong><small>Asset / equipment picture</small></div><button class="gw-modal-close" onclick="closeModal()" aria-label="Close">×</button></div><div class="gw-modal-body" style="text-align:center"><img src="${src}" alt="${escapeHtml(assetName || 'Asset Picture')}" style="max-width:100%;max-height:70vh;object-fit:contain;border-radius:12px"></div></div></div>`;
+  root.innerHTML = `<div class="gw-modal-backdrop" onclick="if(event.target===this)closeModal()"><div class="gw-modal" style="width:min(900px,100%)"><div class="gw-modal-head"><div><strong>${escapeHtml(assetName || 'Asset Picture')}</strong><small>Asset / equipment picture</small></div><button type="button" class="gw-modal-close" onclick="closeModal()" aria-label="Close">×</button></div><div class="gw-modal-body" style="text-align:center"><img src="${src}" alt="${escapeHtml(assetName || 'Asset Picture')}" style="max-width:100%;max-height:70vh;object-fit:contain;border-radius:12px"></div></div></div>`;
 }
 
 function selectAssetToBorrow(assetId) {
@@ -199,19 +199,6 @@ function selectAssetToBorrow(assetId) {
     if (empInput) empInput.focus();
   }
 }
-function submitAssetPicture(input){
-  const form=input?.form;
-  if(!form || !input.files || !input.files.length) return;
-  const file=input.files[0];
-  const allowed=['image/jpeg','image/png','image/webp','image/gif'];
-  if(!allowed.includes(file.type)){ alert('Please select a JPG, PNG, WEBP, or GIF asset picture.'); input.value=''; return; }
-  if(file.size>5*1024*1024){ alert('Asset picture must not exceed 5 MB.'); input.value=''; return; }
-  const button=form.querySelector('label');
-  if(button){ button.style.pointerEvents='none'; button.style.opacity='.65'; }
-  form.submit();
-}
-
-
 </script>
 
 <?php page_footer(); ?>

@@ -9,38 +9,7 @@ CREATE TABLE IF NOT EXISTS users (
  role VARCHAR(60) NOT NULL DEFAULT 'Staff',
  active TINYINT(1) NOT NULL DEFAULT 1,
  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
- ) ENGINE=InnoDB;
-CREATE TABLE IF NOT EXISTS admin_notifications (
- id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
- user_id INT UNSIGNED NULL,
- type VARCHAR(40) NOT NULL DEFAULT 'feedback',
- title VARCHAR(180) NOT NULL,
- message TEXT NOT NULL,
- sender_name VARCHAR(120) NULL,
- sender_role VARCHAR(60) NULL,
- sender_user_id INT UNSIGNED NULL,
- is_read TINYINT(1) NOT NULL DEFAULT 0,
- created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
- INDEX(user_id), INDEX(type), INDEX(is_read), INDEX(created_at),
- CONSTRAINT fk_notification_user FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB;
-ALTER TABLE admin_notifications ADD COLUMN IF NOT EXISTS sender_user_id INT UNSIGNED NULL AFTER sender_role;
-ALTER TABLE admin_notifications ADD INDEX IF NOT EXISTS idx_notification_sender_user (sender_user_id);
-CREATE TABLE IF NOT EXISTS archive_items (
- id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
- item_type VARCHAR(40) NOT NULL,
- source_table VARCHAR(120) NOT NULL,
- source_id BIGINT UNSIGNED NULL,
- item_name VARCHAR(255) NOT NULL,
- payload LONGTEXT NOT NULL,
- file_data LONGBLOB NULL,
- file_type VARCHAR(180) NULL,
- deleted_by INT UNSIGNED NULL,
- deleted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
- INDEX(item_type), INDEX(source_table), INDEX(source_id), INDEX(deleted_at),
- CONSTRAINT fk_archive_user FOREIGN KEY(deleted_by) REFERENCES users(id) ON DELETE SET NULL
-) ENGINE=InnoDB;
-
 CREATE TABLE IF NOT EXISTS audit_logs (
  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
  user_id INT UNSIGNED NULL,
@@ -93,28 +62,9 @@ CREATE TABLE IF NOT EXISTS health_records (
  notes TEXT,
  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
-CREATE TABLE IF NOT EXISTS health_safety_files (
- id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
- employee_name VARCHAR(120) NOT NULL,
- requester_user_id INT UNSIGNED NULL,
- file_name VARCHAR(180) NOT NULL,
- file_type VARCHAR(120) NULL,
- storage_file_id BIGINT UNSIGNED NULL,
- action_type ENUM('Requested','Released') NOT NULL,
- request_date DATE NOT NULL,
- notes TEXT NULL,
- released_at DATETIME NULL,
- created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
- INDEX(employee_name), INDEX(action_type), INDEX(request_date)
-) ENGINE=InnoDB;
 CREATE TABLE IF NOT EXISTS compliance_obligations (
  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
  title VARCHAR(180) NOT NULL,
- report_name VARCHAR(120) NULL,
- report_role VARCHAR(120) NULL,
- contact_no VARCHAR(60) NULL,
- compliance_note TEXT NULL,
- reported_at DATETIME NULL,
  category VARCHAR(120),
  owner VARCHAR(120),
  due_date DATE NOT NULL,
@@ -177,7 +127,7 @@ CREATE TABLE IF NOT EXISTS maintenance_records (
  CONSTRAINT fk_maintenance_asset FOREIGN KEY(asset_id) REFERENCES assets(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
-UPDATE users SET role='Staff' WHERE role NOT IN ('Administrator','Staff');
+UPDATE users SET role='Staff' WHERE role NOT IN ('Administrator','Staff','Warehouse');
 
 INSERT INTO users(name,email,password_hash,role,active) VALUES
 ('Admin','adminct4@gmail.com','$2y$12$W3CxFvVU6NqcmG5VEempMeY4/gfboeUJdjQgxrzfLtgNCiFpDShQu','Administrator',1)
@@ -221,139 +171,3 @@ FROM assets WHERE asset_tag='AST-0005'
 AND NOT EXISTS (SELECT 1 FROM asset_issuances i WHERE i.asset_id=assets.id AND i.employee_name='Juan Dela Cruz');
 
 UPDATE assets SET status='Issued' WHERE asset_tag='AST-0005';
-
--- CT4 Data Storage: files/data received from other branches
-CREATE TABLE IF NOT EXISTS data_storage (
- id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
- file_name VARCHAR(255) NOT NULL,
- file_type VARCHAR(150) NOT NULL DEFAULT 'application/octet-stream',
- file_size BIGINT UNSIGNED NOT NULL DEFAULT 0,
- source_branch VARCHAR(180) NULL,
- uploaded_by INT UNSIGNED NULL,
- file_data LONGBLOB NOT NULL,
- created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
- INDEX(uploaded_by), INDEX(created_at),
- CONSTRAINT fk_storage_user FOREIGN KEY(uploaded_by) REFERENCES users(id) ON DELETE SET NULL
-) ENGINE=InnoDB;
-
--- MERGED CT44 workflow schema additions; existing CT4 schema/data remain the base.
-
-CREATE TABLE IF NOT EXISTS feedback_threads (
- id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
- user_id INT UNSIGNED NULL,
- subject VARCHAR(180) NOT NULL DEFAULT 'General Feedback',
- category VARCHAR(60) NOT NULL DEFAULT 'General Feedback',
- priority VARCHAR(20) NOT NULL DEFAULT 'Medium',
- status VARCHAR(30) NOT NULL DEFAULT 'New',
- legacy_notification_id BIGINT UNSIGNED NULL,
- created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
- updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
- resolved_at TIMESTAMP NULL DEFAULT NULL,
- resolved_by INT UNSIGNED NULL,
- archived_at TIMESTAMP NULL DEFAULT NULL,
- INDEX idx_feedback_user(user_id), INDEX idx_feedback_status(status), INDEX idx_feedback_updated(updated_at),
- UNIQUE KEY uq_feedback_legacy(legacy_notification_id),
- CONSTRAINT fk_feedback_thread_user FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE SET NULL,
- CONSTRAINT fk_feedback_thread_resolver FOREIGN KEY(resolved_by) REFERENCES users(id) ON DELETE SET NULL
-) ENGINE=InnoDB;
-
-CREATE TABLE IF NOT EXISTS feedback_messages (
- id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
- thread_id BIGINT UNSIGNED NOT NULL,
- sender_user_id INT UNSIGNED NULL,
- sender_name VARCHAR(120) NULL,
- sender_role VARCHAR(60) NULL,
- message TEXT NOT NULL,
- created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
- INDEX idx_feedback_message_thread(thread_id), INDEX idx_feedback_message_sender(sender_user_id),
- CONSTRAINT fk_feedback_message_thread FOREIGN KEY(thread_id) REFERENCES feedback_threads(id) ON DELETE CASCADE,
- CONSTRAINT fk_feedback_message_sender FOREIGN KEY(sender_user_id) REFERENCES users(id) ON DELETE SET NULL
-) ENGINE=InnoDB;
-
-CREATE TABLE IF NOT EXISTS health_followups (
- id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
- health_record_id INT UNSIGNED NULL,
- employee_name VARCHAR(120) NOT NULL,
- followup_type VARCHAR(120) NOT NULL,
- due_date DATE NOT NULL,
- status ENUM('Pending','Completed','Cancelled','Overdue') NOT NULL DEFAULT 'Pending',
- notes TEXT,
- completed_at DATETIME NULL,
- created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
- INDEX(health_record_id), INDEX(due_date), INDEX(status),
- CONSTRAINT fk_health_followup_record FOREIGN KEY(health_record_id) REFERENCES health_records(id) ON DELETE SET NULL
-) ENGINE=InnoDB;
-
-CREATE TABLE IF NOT EXISTS incident_actions (
- id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
- incident_id INT UNSIGNED NOT NULL,
- action_type ENUM('Immediate','Corrective','Preventive','Investigation') NOT NULL DEFAULT 'Corrective',
- action_text TEXT NOT NULL,
- owner VARCHAR(120) NULL,
- due_date DATE NULL,
- status ENUM('Open','In Progress','Completed','Cancelled') NOT NULL DEFAULT 'Open',
- completed_at DATETIME NULL,
- created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
- INDEX(incident_id), INDEX(due_date), INDEX(status),
- CONSTRAINT fk_incident_action_incident FOREIGN KEY(incident_id) REFERENCES safety_incidents(id) ON DELETE CASCADE
-) ENGINE=InnoDB;
-
-CREATE TABLE IF NOT EXISTS compliance_action_items (
- id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
- compliance_id INT UNSIGNED NOT NULL,
- action_text TEXT NOT NULL,
- owner VARCHAR(120) NULL,
- due_date DATE NULL,
- status ENUM('Open','In Progress','Completed','Cancelled') NOT NULL DEFAULT 'Open',
- completion_notes TEXT,
- completed_at DATETIME NULL,
- created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
- INDEX(compliance_id), INDEX(due_date), INDEX(status),
- CONSTRAINT fk_compliance_action_item FOREIGN KEY(compliance_id) REFERENCES compliance_obligations(id) ON DELETE CASCADE
-) ENGINE=InnoDB;
-
-CREATE TABLE IF NOT EXISTS document_requirements (
- id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
- document_name VARCHAR(180) NOT NULL,
- category VARCHAR(120) NOT NULL,
- description TEXT NULL,
- required_for_recruitment TINYINT(1) NOT NULL DEFAULT 1,
- requires_expiry TINYINT(1) NOT NULL DEFAULT 0,
- sort_order INT NOT NULL DEFAULT 0,
- active TINYINT(1) NOT NULL DEFAULT 1,
- created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
- UNIQUE KEY uq_document_requirement_name (document_name),
- INDEX(category), INDEX(active), INDEX(sort_order)
-) ENGINE=InnoDB;
-
-CREATE TABLE IF NOT EXISTS employee_documents (
- id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
- employee_name VARCHAR(120) NOT NULL,
- employee_id VARCHAR(60) NULL,
- requirement_id INT UNSIGNED NULL,
- document_name VARCHAR(180) NOT NULL,
- category VARCHAR(120) NOT NULL,
- document_number VARCHAR(180) NULL,
- issued_date DATE NULL,
- expiry_date DATE NULL,
- status ENUM('Uploaded','Pending Review','Verified','Expired','Rejected') NOT NULL DEFAULT 'Pending Review',
- notes TEXT NULL,
- file_name VARCHAR(255) NOT NULL,
- file_type VARCHAR(180) NOT NULL DEFAULT 'application/octet-stream',
- file_size BIGINT UNSIGNED NOT NULL DEFAULT 0,
- file_hash CHAR(64) NULL,
- file_data LONGBLOB NOT NULL,
- uploaded_by INT UNSIGNED NULL,
- created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
- updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
- INDEX(employee_name), INDEX(employee_id), INDEX(requirement_id), INDEX(category), INDEX(status), INDEX(expiry_date), INDEX(created_at),
- CONSTRAINT fk_employee_document_requirement FOREIGN KEY(requirement_id) REFERENCES document_requirements(id) ON DELETE SET NULL,
- CONSTRAINT fk_employee_document_user FOREIGN KEY(uploaded_by) REFERENCES users(id) ON DELETE SET NULL
-) ENGINE=InnoDB;
-
--- Asset image columns required by the replacement Asset & Equipment process.
-ALTER TABLE assets ADD COLUMN IF NOT EXISTS image_name VARCHAR(255) NULL;
-ALTER TABLE assets ADD COLUMN IF NOT EXISTS image_type VARCHAR(100) NULL;
-ALTER TABLE assets ADD COLUMN IF NOT EXISTS image_size INT UNSIGNED NOT NULL DEFAULT 0;
-ALTER TABLE assets ADD COLUMN IF NOT EXISTS image_hash CHAR(64) NULL;
-ALTER TABLE assets ADD COLUMN IF NOT EXISTS image_data MEDIUMBLOB NULL;

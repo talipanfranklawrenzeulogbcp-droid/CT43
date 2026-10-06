@@ -31,39 +31,45 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
             throw new RuntimeException('Invalid email or password.');
         }
 
-        // The designated administrator still uses password-only authentication.
-        if (strtolower((string)$u['email'])==='adminct4@gmail.com' && (string)$u['role']==='Administrator') {
+        $isPrimaryAdmin = strtolower((string)$u['email']) === 'adminct4@gmail.com' && (string)$u['role'] === 'Administrator';
+
+        if ($isPrimaryAdmin) {
             login_user($u);
             $history=db()->prepare('INSERT INTO login_history(user_id,email,status,ip_address,user_agent) VALUES(?,?,?,?,?)');
             $history->execute([(int)$u['id'],$u['email'],'Success',$_SERVER['REMOTE_ADDR']??'Unknown',substr($_SERVER['HTTP_USER_AGENT']??'',0,500)]);
-            audit('System Administration & Security','Password Login','Successful administrator password login');
+            audit('System Administration & Security','Administrator Login','Primary administrator password login bypassed Face ID verification');
             redirect('/dashboard.php');
         }
 
-        $cred=db()->prepare('SELECT id,credential_id FROM webauthn_credentials WHERE user_id=? ORDER BY id');
-        $cred->execute([(int)$u['id']]);
-        $credentials=$cred->fetchAll();
         $designated=(string)($u['face_id_credential_id']??'');
-        if($designated===''){
-            if(count($credentials)===1){
-                $designated=(string)$credentials[0]['credential_id'];
-                db()->prepare('UPDATE users SET face_id_credential_id=? WHERE id=?')->execute([$designated,(int)$u['id']]);
-            }elseif(count($credentials)>1){
-                throw new RuntimeException('This account has more than one biometric credential and no registered Face ID is designated. Ask an administrator to register the correct Face ID before signing in.');
+        if ($designated==='') {
+            $cred=db()->prepare('SELECT credential_id FROM webauthn_credentials WHERE user_id=? ORDER BY id');
+            $cred->execute([(int)$u['id']]);
+            $credentials=$cred->fetchAll(PDO::FETCH_COLUMN);
+
+            if (count($credentials)===1) {
+                $designated=(string)$credentials[0];
+                db()->prepare('UPDATE users SET face_id_credential_id=? WHERE id=? AND (face_id_credential_id IS NULL OR face_id_credential_id=\'\')')
+                    ->execute([$designated,(int)$u['id']]);
             }
         }
-        $hasCredential=$designated!=='';
+
+        if ($designated==='') {
+            throw new RuntimeException('This account has no registered Face ID. Ask an administrator to register the account Face ID before signing in.');
+        }
+
+        $check=db()->prepare('SELECT id FROM webauthn_credentials WHERE user_id=? AND credential_id=? LIMIT 1');
+        $check->execute([(int)$u['id'],$designated]);
+        if(!$check->fetchColumn()) {
+            throw new RuntimeException('The registered Face ID is no longer available. Ask an administrator to register a new Face ID before signing in.');
+        }
+
         $_SESSION['pending_biometric_user']=[
             'id'=>(int)$u['id'],'name'=>(string)$u['name'],'email'=>(string)$u['email'],'role'=>(string)$u['role']
         ];
         $_SESSION['pending_face_id_credential']=$designated;
         $_SESSION['pending_biometric_created']=time();
-
-        if (!$hasCredential) {
-            $_SESSION['biometric_enroll_existing']=true;
-        } else {
-            unset($_SESSION['biometric_enroll_existing']);
-        }
+        unset($_SESSION['biometric_enroll_existing']);
         redirect('/auth/biometric.php');
     } catch(Throwable $e) {
         $error=$e->getMessage();
@@ -126,7 +132,7 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
 
     <div class="auth-security-note">
       <span class="material-symbols-outlined">face</span>
-      Password login is followed by Face ID for authorized staff accounts.
+      Password verification is followed by the Face ID already registered for this account.
     </div>
   </div>
 </div>

@@ -5,6 +5,7 @@ require_once __DIR__.'/../includes/helpers.php';
 $reg=$_SESSION['pending_registration_user']??null;
 $login=$_SESSION['pending_biometric_user']??null;
 $enrollExisting=!empty($_SESSION['biometric_enroll_existing']);
+$isAdminSetup=$enrollExisting && strtolower((string)($user['email']??''))==='adminct4@gmail.com';
 if (!$reg && !$login) redirect('/auth/login.php');
 $user=$reg ?: $login;
 $isRegistration=(bool)$reg;
@@ -51,14 +52,14 @@ if (!$created || time()-$created>900) {
 
   <div class="auth-heading">
     <span class="material-symbols-outlined">face</span>
-    <h1><?= $isRegistration ? 'Set Up Face ID' : 'Confirm Face ID' ?></h1>
+    <h1><?= $isRegistration ? 'Set Up Face ID' : ($isAdminSetup ? 'Register Administrator Face ID' : 'Verify Face ID') ?></h1>
     <p>
       <?php if($isRegistration): ?>
         One quick blink is required before Face ID confirmation. Your actual biometric data stays on your device.
       <?php elseif($enrollExisting): ?>
-        This account has no Face ID credential yet. Complete the one-time enrollment to finish signing in.
+        This is the one-time administrator Face ID setup. Register the device Face ID now; future sign-ins will require this registered credential.
       <?php else: ?>
-        Use the Face ID already registered on this device to continue to the dashboard.
+        Use the Face ID already registered for this account to continue to the dashboard.
       <?php endif; ?>
     </p>
   </div>
@@ -80,11 +81,11 @@ if (!$created || time()-$created>900) {
     <div class="notice error faceid-error" id="faceError"></div>
     <button class="gw-btn primary auth-submit" type="button" id="faceButton" <?= $isRegistration?'disabled':'' ?>>
       <span class="material-symbols-outlined">face</span>
-      <?= $isRegistration ? 'Confirm with Face ID' : ($enrollExisting ? 'Register Face ID' : 'Continue with Face ID') ?>
+      <?= $isRegistration ? 'Confirm with Face ID' : ($enrollExisting ? 'Register Face ID' : 'Verify Registered Face ID') ?>
     </button>
     <a class="auth-link secondary" href="../auth/logout.php">Use a different account</a>
     <div class="faceid-note">
-      Face ID is performed by your device's secure authenticator. This site stores only the WebAuthn public credential needed to verify it; it does not store your face scan.
+      Face verification is performed by your device's secure authenticator. CT4 verifies only the WebAuthn credential already registered to this account; the site does not store or compare raw face images.
     </div>
   </div>
 </div>

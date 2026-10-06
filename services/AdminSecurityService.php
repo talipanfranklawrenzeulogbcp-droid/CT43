@@ -51,7 +51,7 @@ final class AdminSecurityService {
             $q=$this->pdo->prepare('SELECT id,name,email,role,active FROM users WHERE id=? LIMIT 1'); $q->execute([$targetId]);
             $target=$q->fetch(PDO::FETCH_ASSOC);
             if(!$target) throw new RuntimeException('User account not found.');
-            if(strtolower((string)$target['email'])==='adminct4@gmail.com') throw new RuntimeException('The primary administrator uses password-only authentication and does not require Face ID.');
+            if(strtolower((string)$target['email'])==='adminct4@gmail.com') throw new RuntimeException('The primary administrator must complete Face ID setup from the sign-in screen before Face ID can be managed here.');
             $_SESSION['pending_admin_face_user']=['id'=>(int)$target['id'],'name'=>(string)$target['name'],'email'=>(string)$target['email'],'role'=>(string)$target['role']];
             $_SESSION['pending_admin_face_created']=time();
             $this->audit->record($user,self::MODULE,'Start Face ID Enrollment',(string)$target['email']);

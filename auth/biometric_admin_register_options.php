@@ -8,7 +8,7 @@ if ((current_user()['role']??'')!=='Administrator') wa_json_response(['ok'=>fals
 $user=$_SESSION['pending_admin_face_user']??null;
 $created=(int)($_SESSION['pending_admin_face_created']??0);
 if (!$user || !$created || time()-$created>900) wa_json_response(['ok'=>false,'error'=>'Face ID enrollment session expired.'],401);
-if (strtolower((string)$user['email'])==='adminct4@gmail.com') wa_json_response(['ok'=>false,'error'=>'The primary administrator does not use Face ID.'],400);
+if (strtolower((string)$user['email'])==='adminct4@gmail.com') wa_json_response(['ok'=>false,'error'=>'Complete the primary administrator Face ID setup from the sign-in screen first.'],400);
 $challenge=wa_new_challenge(); wa_store_challenge('admin_register',$challenge);
 $existing=db()->prepare('SELECT face_id_credential_id FROM users WHERE id=? LIMIT 1');
 $existing->execute([(int)$user['id']]); $designated=(string)($existing->fetchColumn()??'');

@@ -37,13 +37,13 @@ HTTP 503 without exposing the database password.
 - Email: `adminct4@gmail.com`
 - Password: the administrator password configured in the supplied database seed.
 
-The designated administrator account uses password-only login. Do not expose or commit the administrator password.
+All active accounts require password verification followed by the Face ID credential already registered to that account. The primary administrator may complete a one-time Face ID enrollment immediately after the bootstrap password is accepted; subsequent logins require that registered Face ID. Do not expose or commit the administrator password.
 
 ## Login flow
 1. Enter email and password.
-2. Staff accounts continue to a platform Face ID / passkey prompt.
+2. All active accounts continue to a platform Face ID / passkey prompt bound to the exact credential registered for that user.
 3. New accounts complete a camera liveness check requiring one blink, then enroll Face ID before activation.
-4. The designated administrator `adminct4@gmail.com` uses password-only login. On first deployment, the one-time bootstrap password is `ISMERSCT4`; change it immediately after signing in. Only administrators can create user accounts from System Administration & Security; public self-registration is disabled.
+4. All active accounts require password verification followed by the Face ID credential already registered to that account. The primary administrator `adminct4@gmail.com` may perform a one-time Face ID enrollment immediately after the bootstrap password is accepted; after enrollment, the administrator also requires the registered Face ID for every login. Only administrators can create user accounts from System Administration & Security; public self-registration is disabled.
 
 The site does not store face images or biometric templates. WebAuthn stores only a credential ID, public key and authenticator counter. On Apple devices with Face ID, the platform authenticator performs the Face ID verification.
 

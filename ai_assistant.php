@@ -33,7 +33,7 @@ page_header('AI System Assistant','ai'); ?>
 
     <div class="ai-security-card">
       <span class="material-symbols-outlined">verified_user</span>
-      <div><strong>Protected context</strong><p>Passwords, OTPs, API keys, and other secrets are excluded from AI context.</p></div>
+      <div><strong>Protected context</strong><p>Passwords, biometric authentication data, API keys, and other secrets are excluded from AI context.</p></div>
     </div>
   </aside>
 
@@ -63,7 +63,7 @@ page_header('AI System Assistant','ai'); ?>
       </div>
     </div>
 
-    <form id="aiForm" class="ai-input-row" autocomplete="off">
+    <form id="aiForm" class="ai-input-row" autocomplete="off"><?=csrf_field()?>
       <div class="ai-input-wrap">
         <textarea id="aiInput" name="message" rows="1" maxlength="4000" placeholder="Type your question about CT4..." aria-label="Ask the CT4 AI Assistant"></textarea>
         <span class="ai-input-hint">Enter to send • Shift + Enter for a new line</span>

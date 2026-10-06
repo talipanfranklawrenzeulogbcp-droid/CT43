@@ -41,7 +41,7 @@ function smtp_connect_and_auth() {
         'tcp://'.MAIL_HOST.':'.MAIL_PORT,
         $errno,
         $errstr,
-        20,
+        MAIL_SMTP_TIMEOUT_SECONDS,
         STREAM_CLIENT_CONNECT,
         $context
     );
@@ -49,7 +49,7 @@ function smtp_connect_and_auth() {
     if (!$socket) {
         throw new RuntimeException('Unable to connect to Gmail SMTP ('.$errno.'): '.$errstr);
     }
-    stream_set_timeout($socket, 20);
+    stream_set_timeout($socket, MAIL_SMTP_TIMEOUT_SECONDS);
 
     try {
         smtp_expect($socket, [220]);

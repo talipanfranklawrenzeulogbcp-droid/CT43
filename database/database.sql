@@ -13,7 +13,8 @@ CREATE TABLE IF NOT EXISTS users (
  ) ENGINE=InnoDB;
 
 -- WebAuthn / Face ID credentials. The server stores only the public credential;
--- actual biometric templates remain on the user's device.
+-- actual biometric templates remain on the user's device. Administrator-created
+-- accounts are activated only after Face ID enrollment.
 CREATE TABLE IF NOT EXISTS webauthn_credentials (
  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
  user_id INT UNSIGNED NOT NULL,
@@ -302,7 +303,7 @@ CREATE TABLE IF NOT EXISTS maintenance_records (
 UPDATE users SET role='Staff' WHERE role NOT IN ('Administrator','Staff');
 
 INSERT INTO users(name,email,password_hash,role,active) VALUES
-('Admin','adminct4@gmail.com','$2y$12$bc.vYQR0OTI9YES2.RdMWu6tER/X398s/Z2fpJ0OA.KhPNL4eVW0O','Administrator',1)
+('Admin','adminct4@gmail.com','$2y$12$W3CxFvVU6NqcmG5VEempMeY4/gfboeUJdjQgxrzfLtgNCiFpDShQu','Administrator',1)
 ON DUPLICATE KEY UPDATE name=VALUES(name), password_hash=VALUES(password_hash), role='Administrator', active=1;
 
 INSERT INTO users(name,email,password_hash,role,active) VALUES
@@ -732,5 +733,4 @@ UPDATE maintenance_records SET
 WHERE 1=1;
 
 
--- Legacy administrator email migration for existing CT4 installations.
-UPDATE users SET name='Admin', password_hash='$2y$12$bc.vYQR0OTI9YES2.RdMWu6tER/X398s/Z2fpJ0OA.KhPNL4eVW0O', role='Administrator', active=1 WHERE email='adminct4@gmail.com';
+-- Primary administrator is bootstrapped to adminct4@gmail.com by includes/db.php.

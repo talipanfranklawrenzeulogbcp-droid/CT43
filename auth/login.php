@@ -83,7 +83,6 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
       <p>Sign in to access Governance, Safety &amp; System Administration.</p>
     </div>
     <?php if($error):?><div class="notice error auth-error"><?=e($error)?></div><?php endif;?>
-    <?php if($success):?><div class="notice success auth-error"><?=e($success)?></div><?php endif;?>
 
     <form method="post" class="auth-form" id="loginForm"><?=csrf_field()?>
       <input type="hidden" name="action" value="login">
@@ -115,12 +114,9 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
       </button>
     </form>
 
-    <div style="text-align:center;margin-top:14px">
-      <span class="auth-link secondary">New accounts are created by an administrator.</span>
-    </div>
     <div class="auth-security-note">
       <span class="material-symbols-outlined">face</span>
-      Password login is followed by Face ID. The biometric stays on your device.
+      Password login is followed by Face ID for authorized staff accounts.
     </div>
   </div>
 </div>

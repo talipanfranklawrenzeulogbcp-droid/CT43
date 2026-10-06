@@ -53,19 +53,38 @@ function db(): PDO {
             INDEX idx_webauthn_user (user_id),
             CONSTRAINT fk_webauthn_user FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
         ) ENGINE=InnoDB");
-        // Ensure the one designated bootstrap administrator exists with the requested
-        // credentials. All other accounts continue through WebAuthn authentication.
-        $adminHash = '$2y$12$bc.vYQR0OTI9YES2.RdMWu6tER/X398s/Z2fpJ0OA.KhPNL4eVW0O';
-        $findAdmin = $pdo->prepare("SELECT id FROM users WHERE LOWER(email) IN ('adminct4@gmail.com','adminct4@mail.com') ORDER BY CASE WHEN LOWER(email)='adminct4@gmail.com' THEN 0 ELSE 1 END LIMIT 1");
-        $findAdmin->execute();
-        $adminId = $findAdmin->fetchColumn();
-        if ($adminId) {
-            $setAdmin = $pdo->prepare("UPDATE users SET name='Admin', email='adminct4@gmail.com', password_hash=?, role='Administrator', active=1 WHERE id=?");
-            $setAdmin->execute([$adminHash, (int)$adminId]);
-            $pdo->exec("UPDATE users SET active=0 WHERE LOWER(email)='adminct4@mail.com' AND id<>".(int)$adminId);
+        // One-time primary administrator bootstrap. The bootstrap password is
+        // hashed immediately and is never stored in plaintext in the database.
+        // A migration marker prevents resetting a changed password on each request.
+        $pdo->exec("CREATE TABLE IF NOT EXISTS app_migrations (migration_key VARCHAR(120) PRIMARY KEY, applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB");
+        $bootstrapKey = 'primary_admin_gmail_bootstrap_v1';
+        $mark = $pdo->prepare('SELECT migration_key FROM app_migrations WHERE migration_key=? LIMIT 1');
+        $mark->execute([$bootstrapKey]);
+        if (!$mark->fetchColumn()) {
+            $email = 'adminct4@gmail.com';
+            $find = $pdo->prepare('SELECT id FROM users WHERE LOWER(email)=? LIMIT 1');
+            $find->execute([$email]);
+            $adminId = (int)($find->fetchColumn() ?: 0);
+            if (!$adminId) {
+                // Migrate the earlier designated admin if present, otherwise create it.
+                $find->execute(['adminct4@mail.com']);
+                $adminId = (int)($find->fetchColumn() ?: 0);
+                if ($adminId) {
+                    $pdo->prepare('UPDATE users SET email=? WHERE id=?')->execute([$email, $adminId]);
+                } else {
+                    $adminName = 'CT4 Administrator';
+                    $adminPasswordHash = password_hash('ISMERSCT4', PASSWORD_DEFAULT);
+                    $create = $pdo->prepare("INSERT INTO users(name,email,password_hash,role,active) VALUES(?,?,?,'Administrator',1)");
+                    $create->execute([$adminName, $email, $adminPasswordHash]);
+                    $adminId = (int)$pdo->lastInsertId();
+                }
+            }
+            $adminPasswordHash = password_hash('ISMERSCT4', PASSWORD_DEFAULT);
+            $pdo->prepare("UPDATE users SET role='Administrator',active=1,password_hash=? WHERE id=?")->execute([$adminPasswordHash, $adminId]);
+            $pdo->prepare('INSERT INTO app_migrations(migration_key) VALUES(?)')->execute([$bootstrapKey]);
         } else {
-            $createAdmin = $pdo->prepare("INSERT INTO users(name,email,password_hash,role,active) VALUES('Admin','adminct4@gmail.com',?,'Administrator',1)");
-            $createAdmin->execute([$adminHash]);
+            // Keep the designated account enabled and administrative without resetting its password.
+            $pdo->prepare("UPDATE users SET role='Administrator',active=1 WHERE LOWER(email)='adminct4@gmail.com'")->execute();
         }
     } catch (Throwable $e) { /* Retry on the next request if schema privileges are temporary. */ }
 

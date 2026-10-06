@@ -116,7 +116,7 @@ function login_user(array $user): void {
     ];
 
     // A successful login must never retain unfinished biometric state.
-    unset($_SESSION['pending_biometric_user'], $_SESSION['pending_biometric_created'], $_SESSION['pending_registration_user'], $_SESSION['pending_registration_created'], $_SESSION['biometric_enroll_existing']);
+    unset($_SESSION['pending_biometric_user'], $_SESSION['pending_biometric_created'], $_SESSION['pending_registration_user'], $_SESSION['pending_registration_created'], $_SESSION['biometric_enroll_existing'], $_SESSION['pending_face_id_credential']);
 }
 
 function logout_user(): void {

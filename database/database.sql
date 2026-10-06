@@ -9,7 +9,9 @@ CREATE TABLE IF NOT EXISTS users (
  password_hash VARCHAR(255) NOT NULL,
  role VARCHAR(60) NOT NULL DEFAULT 'Staff',
  active TINYINT(1) NOT NULL DEFAULT 1,
- created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+ face_id_credential_id VARCHAR(1024) NULL,
+ created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+ INDEX idx_users_face_id_credential (face_id_credential_id(191))
  ) ENGINE=InnoDB;
 
 -- WebAuthn / Face ID credentials. The server stores only the public credential;

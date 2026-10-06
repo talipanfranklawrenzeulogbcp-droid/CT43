@@ -83,7 +83,7 @@ page_header('Asset & Equipment Issuance','assets');show_flash();?>
               <input type="hidden" name="action" value="update_asset_picture">
               <input type="hidden" name="asset_id" value="<?= (int)$a['id'] ?>">
               <label class="gw-btn ghost" style="padding:4px 8px;font-size:11px;cursor:pointer;display:inline-block">
-                <?=!empty($a['image_data'])?'Change Picture':'Add Picture'?><input type="file" name="asset_image" accept="image/jpeg,image/png,image/webp,image/gif" style="display:none" onchange="this.form.submit()">
+                <?=!empty($a['image_data'])?'Change Picture':'Add Picture'?><input type="file" name="asset_image" accept="image/jpeg,image/png,image/webp,image/gif" style="display:none" onchange="submitAssetPicture(this)">
               </label>
             </form>
           </td>
@@ -199,6 +199,19 @@ function selectAssetToBorrow(assetId) {
     if (empInput) empInput.focus();
   }
 }
+function submitAssetPicture(input){
+  const form=input?.form;
+  if(!form || !input.files || !input.files.length) return;
+  const file=input.files[0];
+  const allowed=['image/jpeg','image/png','image/webp','image/gif'];
+  if(!allowed.includes(file.type)){ alert('Please select a JPG, PNG, WEBP, or GIF asset picture.'); input.value=''; return; }
+  if(file.size>5*1024*1024){ alert('Asset picture must not exceed 5 MB.'); input.value=''; return; }
+  const button=form.querySelector('label');
+  if(button){ button.style.pointerEvents='none'; button.style.opacity='.65'; }
+  form.submit();
+}
+
+
 </script>
 
 <?php page_footer(); ?>

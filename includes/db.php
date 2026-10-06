@@ -53,6 +53,21 @@ function db(): PDO {
             INDEX idx_webauthn_user (user_id),
             CONSTRAINT fk_webauthn_user FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
         ) ENGINE=InnoDB");
+        // One designated Face ID credential is used for login. This migration is
+        // additive: existing credential rows and user data are preserved.
+        $pdo->exec("ALTER TABLE users ADD COLUMN IF NOT EXISTS face_id_credential_id VARCHAR(1024) NULL");
+        $pdo->exec("ALTER TABLE users ADD INDEX IF NOT EXISTS idx_users_face_id_credential (face_id_credential_id(191))");
+        // Auto-designate the only legacy credential. Never guess when multiple
+        // authenticators exist.
+        $pdo->exec("UPDATE users u
+            JOIN (
+                SELECT user_id, MIN(id) AS credential_row, COUNT(*) AS credential_count
+                FROM webauthn_credentials GROUP BY user_id
+            ) c ON c.user_id=u.id
+            JOIN webauthn_credentials w ON w.id=c.credential_row
+            SET u.face_id_credential_id=w.credential_id
+            WHERE c.credential_count=1 AND (u.face_id_credential_id IS NULL OR u.face_id_credential_id='')");
+
         // One-time primary administrator bootstrap. The bootstrap password is
         // hashed immediately and is never stored in plaintext in the database.
         // A migration marker prevents resetting a changed password on each request.

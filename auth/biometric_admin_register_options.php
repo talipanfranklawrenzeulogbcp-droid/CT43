@@ -10,9 +10,10 @@ $created=(int)($_SESSION['pending_admin_face_created']??0);
 if (!$user || !$created || time()-$created>900) wa_json_response(['ok'=>false,'error'=>'Face ID enrollment session expired.'],401);
 if (strtolower((string)$user['email'])==='adminct4@gmail.com') wa_json_response(['ok'=>false,'error'=>'The primary administrator does not use Face ID.'],400);
 $challenge=wa_new_challenge(); wa_store_challenge('admin_register',$challenge);
-$existing=db()->prepare('SELECT credential_id FROM webauthn_credentials WHERE user_id=?');
-$existing->execute([(int)$user['id']]); $exclude=[];
-while($r=$existing->fetch()) $exclude[]=['type'=>'public-key','id'=>(string)$r['credential_id']];
+$existing=db()->prepare('SELECT face_id_credential_id FROM users WHERE id=? LIMIT 1');
+$existing->execute([(int)$user['id']]); $designated=(string)($existing->fetchColumn()??'');
+if($designated!=='') wa_json_response(['ok'=>false,'error'=>'This account already has a registered Face ID.'],400);
+$exclude=[];
 wa_json_response(['ok'=>true,'options'=>[
  'challenge'=>wa_b64u_encode($challenge),
  'rp'=>['name'=>'Great Solomon Manpower Services Inc. Core Transaction 4','id'=>wa_rp_id()],

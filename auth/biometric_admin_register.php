@@ -18,8 +18,11 @@ try {
   $credId=wa_b64u_encode($parsed['credential_id']);
   $check=db()->prepare('SELECT id FROM webauthn_credentials WHERE credential_id=? LIMIT 1'); $check->execute([$credId]);
   if($check->fetchColumn()) throw new RuntimeException('This Face ID credential is already registered.');
+  $current=db()->prepare('SELECT face_id_credential_id FROM users WHERE id=? LIMIT 1');
+  $current->execute([(int)$user['id']]); $currentFace=(string)($current->fetchColumn()??'');
+  if($currentFace!=='') throw new RuntimeException('A registered Face ID already exists for this account.');
   db()->prepare('INSERT INTO webauthn_credentials(user_id,credential_id,public_key,sign_count,transports) VALUES(?,?,?,?,?)')->execute([(int)$user['id'],$credId,$parsed['public_key'],(int)$parsed['sign_count'],'internal']);
-  db()->prepare('UPDATE users SET active=1 WHERE id=?')->execute([(int)$user['id']]);
+  db()->prepare('UPDATE users SET active=1, face_id_credential_id=? WHERE id=?')->execute([$credId,(int)$user['id']]);
   audit('System Administration & Security','Face ID Registration','Administrator completed Face ID enrollment for '.(string)$user['email']);
   unset($_SESSION['pending_admin_face_user'],$_SESSION['pending_admin_face_created']);
   wa_json_response(['ok'=>true]);

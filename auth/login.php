@@ -21,7 +21,7 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
         if ($terms!=='1') throw new RuntimeException('Please confirm the Terms and Conditions before signing in.');
         if (!filter_var($email,FILTER_VALIDATE_EMAIL) || $password==='') throw new RuntimeException('Please enter a valid email address and password.');
 
-        $stmt=db()->prepare('SELECT id,name,email,password_hash,role,active FROM users WHERE email=? LIMIT 1');
+        $stmt=db()->prepare('SELECT id,name,email,password_hash,role,active,face_id_credential_id FROM users WHERE email=? LIMIT 1');
         $stmt->execute([$email]);
         $u=$stmt->fetch();
 
@@ -40,13 +40,23 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
             redirect('/dashboard.php');
         }
 
-        $cred=db()->prepare('SELECT id FROM webauthn_credentials WHERE user_id=? ORDER BY id LIMIT 1');
+        $cred=db()->prepare('SELECT id,credential_id FROM webauthn_credentials WHERE user_id=? ORDER BY id');
         $cred->execute([(int)$u['id']]);
-        $hasCredential=(bool)$cred->fetchColumn();
-
+        $credentials=$cred->fetchAll();
+        $designated=(string)($u['face_id_credential_id']??'');
+        if($designated===''){
+            if(count($credentials)===1){
+                $designated=(string)$credentials[0]['credential_id'];
+                db()->prepare('UPDATE users SET face_id_credential_id=? WHERE id=?')->execute([$designated,(int)$u['id']]);
+            }elseif(count($credentials)>1){
+                throw new RuntimeException('This account has more than one biometric credential and no registered Face ID is designated. Ask an administrator to register the correct Face ID before signing in.');
+            }
+        }
+        $hasCredential=$designated!=='';
         $_SESSION['pending_biometric_user']=[
             'id'=>(int)$u['id'],'name'=>(string)$u['name'],'email'=>(string)$u['email'],'role'=>(string)$u['role']
         ];
+        $_SESSION['pending_face_id_credential']=$designated;
         $_SESSION['pending_biometric_created']=time();
 
         if (!$hasCredential) {

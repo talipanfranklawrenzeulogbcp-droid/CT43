@@ -17,15 +17,17 @@ try{
   $sigB64=(string)($body['response']['signature']??'');
   if($rawId===''||$clientB64===''||$authB64===''||$sigB64==='')throw new RuntimeException('Incomplete Face ID response.');
   $clientJson=wa_verify_client($clientB64,'webauthn.get',$challenge);
+  $designated=(string)($_SESSION['pending_face_id_credential']??'');
+  if($designated==='' || !hash_equals($designated,$rawId)) throw new RuntimeException('Only the registered Face ID credential can be used to sign in to this account.');
   $stmt=db()->prepare('SELECT id,credential_id,public_key,sign_count FROM webauthn_credentials WHERE user_id=? AND credential_id=? LIMIT 1');
-  $stmt->execute([(int)$user['id'],$rawId]); $cred=$stmt->fetch();
-  if(!$cred)throw new RuntimeException('This Face ID credential is not registered for this account.');
+  $stmt->execute([(int)$user['id'],$designated]); $cred=$stmt->fetch();
+  if(!$cred)throw new RuntimeException('The registered Face ID credential is no longer available. Please re-register Face ID.');
   $newCount=wa_verify_assertion(wa_b64u_decode($authB64),$clientJson,wa_b64u_decode($sigB64),(string)$cred['public_key'],(int)$cred['sign_count']);
   db()->prepare('UPDATE webauthn_credentials SET sign_count=?,last_used_at=NOW() WHERE id=?')->execute([$newCount,(int)$cred['id']]);
   login_user($user);
   $history=db()->prepare('INSERT INTO login_history(user_id,email,status,ip_address,user_agent) VALUES(?,?,?,?,?)');
   $history->execute([(int)$user['id'],$user['email'],'Success',$_SERVER['REMOTE_ADDR']??'Unknown',substr($_SERVER['HTTP_USER_AGENT']??'',0,500)]);
   audit('System Administration & Security','Face ID Login','Successful Face ID verification');
-  unset($_SESSION['pending_biometric_user'],$_SESSION['pending_biometric_created'],$_SESSION['biometric_enroll_existing']);
+  unset($_SESSION['pending_biometric_user'],$_SESSION['pending_biometric_created'],$_SESSION['biometric_enroll_existing'],$_SESSION['pending_face_id_credential']);
   wa_json_response(['ok'=>true]);
 }catch(Throwable $e){wa_json_response(['ok'=>false,'error'=>$e->getMessage()],400);}

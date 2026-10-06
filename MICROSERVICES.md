@@ -37,4 +37,4 @@ The default local deployment uses in-process service calls for maximum compatibi
 - Service actions validate allowed status/role values before writing.
 - Existing session authentication is preserved.
 - Existing module audit activity is preserved through the Audit Service.
-- Existing dashboard, login/OTP, logo, roles, activate/deactivate buttons, forms, and navigation are retained.
+- Existing dashboard, login/Face ID, logo, roles, activate/deactivate buttons, forms, and navigation are retained.

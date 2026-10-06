@@ -39,28 +39,57 @@ gsms_load_env_file();
     }
 })();
 
-// --- Database: support both individual DB_* vars and DATABASE_URL ---
-// HostForge managed MySQL injects the individual DB_* variables.
-// External connections may use a single DATABASE_URL string.
+// --- Database configuration -------------------------------------------------
+// Supports:
+//   GSMS_DB_* (preferred)
+//   DATABASE_URL / MYSQL_URL
+//   DB_* / MYSQL_* variables commonly injected by managed MySQL services.
+// Values are resolved once, before the constants below are defined.
 (function (): void {
-    $url = getenv('DATABASE_URL');
-    if ($url && !getenv('GSMS_DB_HOST')) {
-        $p = parse_url($url);
-        if ($p !== false) {
-            if (!empty($p['host']))     putenv('GSMS_DB_HOST='.urldecode($p['host']));
-            if (!empty($p['port']))     putenv('GSMS_DB_PORT='.$p['port']);
-            if (!empty($p['user']))     putenv('GSMS_DB_USER='.urldecode($p['user']));
-            if (!empty($p['pass']))     putenv('GSMS_DB_PASS='.urldecode($p['pass']));
-            if (!empty($p['path']))     putenv('GSMS_DB_NAME='.ltrim(urldecode($p['path']), '/'));
+    $read = static function (string ...$names): ?string {
+        foreach ($names as $name) {
+            $value = getenv($name);
+            if ($value !== false && trim((string)$value) !== '') {
+                return trim((string)$value);
+            }
+        }
+        return null;
+    };
+
+    // A URL is useful on platforms that provide one DATABASE_URL secret.
+    $url = $read('DATABASE_URL', 'MYSQL_URL');
+    if ($url !== null && !$read('GSMS_DB_HOST')) {
+        $parsed = parse_url($url);
+        if ($parsed !== false && !empty($parsed['host'])) {
+            putenv('GSMS_DB_HOST='.urldecode((string)$parsed['host']));
+            if (isset($parsed['port'])) putenv('GSMS_DB_PORT='.(int)$parsed['port']);
+            if (isset($parsed['user'])) putenv('GSMS_DB_USER='.urldecode((string)$parsed['user']));
+            if (isset($parsed['pass'])) putenv('GSMS_DB_PASS='.urldecode((string)$parsed['pass']));
+            if (!empty($parsed['path'])) {
+                putenv('GSMS_DB_NAME='.ltrim(urldecode((string)$parsed['path']), '/'));
+            }
         }
     }
-    // HostForge managed MySQL also injects DB_HOST / DB_DATABASE etc.
-    // Fall back to those if project-prefixed vars are missing.
-    if (!getenv('GSMS_DB_HOST') && getenv('DB_HOST'))     putenv('GSMS_DB_HOST='.getenv('DB_HOST'));
-    if (!getenv('GSMS_DB_PORT') && getenv('DB_PORT'))     putenv('GSMS_DB_PORT='.getenv('DB_PORT'));
-    if (!getenv('GSMS_DB_NAME') && getenv('DB_DATABASE')) putenv('GSMS_DB_NAME='.getenv('DB_DATABASE'));
-    if (!getenv('GSMS_DB_USER') && getenv('DB_USERNAME')) putenv('GSMS_DB_USER='.getenv('DB_USERNAME'));
-    if (!getenv('GSMS_DB_PASS') && getenv('DB_PASSWORD')) putenv('GSMS_DB_PASS='.getenv('DB_PASSWORD'));
+
+    // Common provider/container naming conventions. Project-specific values
+    // always take precedence over these fallbacks.
+    $map = [
+        'GSMS_DB_HOST' => ['DB_HOST', 'MYSQL_HOST'],
+        'GSMS_DB_PORT' => ['DB_PORT', 'MYSQL_PORT', 'MYSQL_TCP_PORT'],
+        'GSMS_DB_NAME' => ['DB_DATABASE', 'MYSQL_DATABASE'],
+        'GSMS_DB_USER' => ['DB_USERNAME', 'MYSQL_USER'],
+        'GSMS_DB_PASS' => ['DB_PASSWORD', 'MYSQL_PASSWORD'],
+    ];
+    foreach ($map as $target => $sources) {
+        if ($read($target) !== null) continue;
+        foreach ($sources as $source) {
+            $value = getenv($source);
+            if ($value !== false && trim((string)$value) !== '') {
+                putenv($target.'='.trim((string)$value));
+                break;
+            }
+        }
+    }
 })();
 
 // --- Application Environment & Debugging ---
@@ -74,26 +103,22 @@ if (APP_ENV === 'production' && !APP_DEBUG) {
 
 // --- Resolved DB constants ---
 define('DB_HOST', getenv('GSMS_DB_HOST') ?: '127.0.0.1');
-define('DB_PORT', (int)(getenv('GSMS_DB_PORT') ?: 3306));
+define('DB_PORT', max(1, (int)(getenv('GSMS_DB_PORT') ?: 3306)));
 define('DB_NAME', getenv('GSMS_DB_NAME') ?: 'great_solomon_ct4');
 define('DB_USER', getenv('GSMS_DB_USER') ?: 'root');
 define('DB_PASS', getenv('GSMS_DB_PASS') ?: '');
+define('DB_CONNECT_TIMEOUT', max(1, (int)(getenv('GSMS_DB_CONNECT_TIMEOUT') ?: 8)));
 
-// --- Gmail SMTP ---
-define('MAIL_HOST',       getenv('GSMS_MAIL_HOST')       ?: 'smtp.gmail.com');
-define('MAIL_PORT',  (int)(getenv('GSMS_MAIL_PORT')      ?: 587));
-define('MAIL_USERNAME',   getenv('GSMS_MAIL_USERNAME')   ?: 'governancesafety21@gmail.com');
-define('MAIL_PASSWORD',   getenv('GSMS_MAIL_PASSWORD')   ?: '');
-define('MAIL_FROM_EMAIL', getenv('GSMS_MAIL_FROM_EMAIL') ?: 'governancesafety21@gmail.com');
-define('MAIL_FROM_NAME',  getenv('GSMS_MAIL_FROM_NAME')  ?: 'Great Solomon Manpower Services Inc. Core Transaction 4');
-define('OTP_SENDER_EMAIL',getenv('GSMS_OTP_SENDER_EMAIL')?: 'governancesafety21@gmail.com');
-define('OTP_EXPIRY_MINUTES', 10);
-define('OTP_MAX_ATTEMPTS',    5);
+// --- Authentication: WebAuthn / Face ID ------------------------------------
+// Biometric templates are never stored by this application; the platform
+// authenticator keeps them on the user's device.
+
+define('WEBAUTHN_TIMEOUT_MS', max(30000, min(180000, (int)(getenv('GSMS_WEBAUTHN_TIMEOUT_MS') ?: 120000))));
 
 // --- Gemini AI ---
 // Never expose this to browser JavaScript.
 define('GEMINI_API_KEY', getenv('GEMINI_API_KEY') ?: getenv('GOOGLE_API_KEY') ?: '');
-define('GEMINI_MODEL',   getenv('GEMINI_MODEL')   ?: 'gemini-2.0-flash');
+define('GEMINI_MODEL',   getenv('GEMINI_MODEL')   ?: 'gemini-3.8-flash');
 
 // --- HTTPS / Secure-cookie detection (HostForge edge proxy terminates TLS) ---
 define('APP_HTTPS', (
@@ -104,6 +129,12 @@ define('APP_HTTPS', (
 ));
 
 // Apply secure session cookie settings on first include.
+// Session security defaults. Keep these consistent across every entry point.
+ini_set('session.use_strict_mode', '1');
+ini_set('session.use_only_cookies', '1');
+ini_set('session.cookie_httponly', '1');
+ini_set('session.cookie_samesite', 'Lax');
+
 if (session_status() === PHP_SESSION_NONE) {
     session_set_cookie_params([
         'lifetime' => 0,

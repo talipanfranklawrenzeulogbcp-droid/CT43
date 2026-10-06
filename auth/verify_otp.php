@@ -19,13 +19,8 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
             db()->prepare('DELETE FROM otp_requests WHERE user_id=?')->execute([(int)$pending['id']]);
             db()->prepare('INSERT INTO otp_requests(user_id,otp_hash,expires_at,attempts) VALUES(?,?,?,0)')
                 ->execute([(int)$pending['id'],$hash,$expires]);
-            try {
-                send_otp_email($pending['email'],$pending['name'],$otp);
-                $success='A new verification code has been sent to your email.';
-            } catch(Throwable $mailError) {
-                db()->prepare('DELETE FROM otp_requests WHERE user_id=?')->execute([(int)$pending['id']]);
-                $error='Unable to send verification code. Check the Gmail SMTP/App Password settings and try again.';
-            }
+            send_otp_email($pending['email'],$pending['name'],$otp);
+            $success='A new verification code has been sent to your email.';
         } else {
             $code=preg_replace('/\D/','',$_POST['otp']??'');
             $stmt=db()->prepare('SELECT id,otp_hash,expires_at,attempts FROM otp_requests WHERE user_id=? ORDER BY id DESC LIMIT 1');
@@ -83,7 +78,6 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
       <h1>Verify Your Identity</h1>
       <p>We sent a 6-digit verification code to <strong><?=e($pending['email'])?></strong>.</p>
     </div>
-
     <?php if($error):?><div class="notice error auth-error"><?=e($error)?></div><?php endif;?>
     <?php if($success):?><div class="notice success auth-error"><?=e($success)?></div><?php endif;?>
     <form method="post" class="auth-form">

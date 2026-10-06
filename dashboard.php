@@ -19,30 +19,24 @@ page_header('Reports, Analysis & Dashboard','dashboard'); show_flash(); ?>
   <div>
     <div class="eyebrow">CORE TRANSACTION 4</div>
     <div class="dashboard-title-brand">
-      <div class="brand-logo-white dashboard-logo-wrap"><img src="<?=e(url('/assets/logo2.svg'))?>" alt="Great Solomon Manpower Services Inc. logo" class="brand-logo-image"></div>
+      <div class="brand-logo-white dashboard-logo-wrap"><img src="assets/logo2.svg" alt="Great Solomon Manpower Services Inc. logo" class="brand-logo-image"></div>
       <h1>Reports, Analysis &amp; Dashboard</h1>
     </div>
-    <p>Central reports, analysis and dashboard for Core Transaction 4<?= $reportDate ? " — incident and health records filtered to ".e($reportDate).". Compliance and asset indicators remain current totals." : " — current module totals and analytics." ?>.</p>
+    <p>Central reports, analysis and dashboard for Core Transaction 4<?= $reportDate ? " — showing records for ".e($reportDate) : " — showing all report dates" ?>.</p>
   </div>
 </section>
 
-<section class="dashboard-analytics-toolbar">
-  <div class="dashboard-analytics-context"><span class="material-symbols-outlined">analytics</span><div><strong>Reports &amp; Analytics Overview</strong><span><?= $reportDate ? 'Filtered to '.e($reportDate) : 'Current system totals and live module activity' ?></span></div></div>
-  <?php $dashboardUnread=unread_notification_count(); ?>
-  <button type="button" class="dashboard-notification-status <?= $dashboardUnread>0?'has-unread':'' ?>" onclick="showNotificationModal()"><span class="status-dot"></span><span><?= $dashboardUnread>0 ? e($dashboardUnread).' unread notification'.($dashboardUnread===1?'':'s') : 'No unread notifications' ?></span></button>
-</section>
 <section class="gw-quick-actions">
-<a href="<?=e(url('/modules/health_safety/index.php'))?>">Health &amp; Safety</a>
-<a href="<?=e(url('/modules/legal_compliance/index.php'))?>">Legal &amp; Compliance</a>
-<?php if (($u['role'] ?? '') === 'Administrator'): ?><a href="<?=e(url('/modules/system_admin_security/index.php'))?>">Security</a><?php endif; ?>
-<a href="<?=e(url('/modules/asset_equipment/index.php'))?>">Assets</a>
+<a href="modules/health_safety/index.php">Health &amp; Safety</a>
+<a href="modules/legal_compliance/index.php">Legal &amp; Compliance</a>
+<?php if (($u['role'] ?? '') === 'Administrator'): ?><a href="modules/system_admin_security/index.php">Security</a><?php endif; ?>
+<a href="modules/asset_equipment/index.php">Assets</a>
 <form method="get" class="date-filter dashboard-date-filter" aria-label="Report date filter">
   <input type="date" name="date" value="<?=e($reportDate)?>" aria-label="Filter reports by date">
   <button class="gw-btn secondary" type="submit"><span class="material-symbols-outlined">filter_alt</span> Filter</button>
   <?php if($reportDate): ?><a class="gw-btn secondary" href="<?=e(url('/dashboard.php'))?>"><span class="material-symbols-outlined">close</span> Clear</a><?php endif; ?>
 </form>
 </section>
-
 
 <section class="gw-stats">
 <div class="gw-stat"><div class="gw-stat-top"><span class="gw-stat-label">Safety Incidents</span><div class="gw-stat-icon"><span class="material-symbols-outlined">health_and_safety</span></div></div><div class="gw-stat-value"><?=e($counts['incidents'])?></div><div class="gw-stat-meta warning"><?=e($counts['open_incidents'])?> open / under investigation</div></div>
@@ -53,11 +47,11 @@ page_header('Reports, Analysis & Dashboard','dashboard'); show_flash(); ?>
 
 <section class="gw-chart-grid" aria-label="Reports and analytics charts">
   <article class="gw-panel gw-dashboard-chart-panel">
-    <div class="gw-panel-head"><div><div class="chart-title-row"><span class="material-symbols-outlined">monitor_heart</span><h2>Health, Safety &amp; Governance</h2></div><span class="chart-subtitle">Incidents, health records and outstanding actions</span></div><span>Live module tracking</span></div>
+    <div class="gw-panel-head"><h2>Health, Safety &amp; Governance</h2><span>Live module tracking</span></div>
     <div class="gw-chart-wrap gw-chart-wrap-large"><canvas id="healthGovernanceBarChart"></canvas></div>
   </article>
   <article class="gw-panel gw-dashboard-chart-panel">
-    <div class="gw-panel-head"><div><div class="chart-title-row"><span class="material-symbols-outlined">inventory_2</span><h2>Assets, Equipment &amp; Issuance</h2></div><span class="chart-subtitle">Current issuance status across registered equipment</span></div><span>All dates</span></div>
+    <div class="gw-panel-head"><h2>Assets, Equipment &amp; Issuance</h2><span>Returned · Not Returned · Overdue · Issued — all dates</span></div>
     <div class="gw-chart-wrap gw-chart-wrap-large"><canvas id="assetIssuancePieChart"></canvas></div>
   </article>
 </section>

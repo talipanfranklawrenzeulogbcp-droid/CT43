@@ -63,7 +63,7 @@ page_header('AI System Assistant','ai'); ?>
       </div>
     </div>
 
-    <form id="aiForm" class="ai-input-row" autocomplete="off">
+    <form id="aiForm" class="ai-input-row" autocomplete="off"><?=csrf_field()?>
       <div class="ai-input-wrap">
         <textarea id="aiInput" name="message" rows="1" maxlength="4000" placeholder="Type your question about CT4..." aria-label="Ask the CT4 AI Assistant"></textarea>
         <span class="ai-input-hint">Enter to send • Shift + Enter for a new line</span>

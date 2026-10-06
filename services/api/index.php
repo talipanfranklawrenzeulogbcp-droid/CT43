@@ -2,9 +2,15 @@
 require_once __DIR__.'/../../includes/auth.php';
 require_once __DIR__.'/../../includes/service_client.php';
 header('Content-Type: application/json; charset=utf-8');
+if($_SERVER['REQUEST_METHOD'] !== 'GET') verify_csrf();
 if(!current_user()){ http_response_code(401); echo json_encode(['ok'=>false,'error'=>'Authentication required']); exit; }
 try {
-    $service=$_GET['service']??''; $action=$_GET['action']??'';
+    $service=(string)($_GET['service']??'');
+    $action=(string)($_GET['action']??'');
+    if($service==='admin') require_admin();
+    if($service==='storage' && !in_array($action,['items','file'],true)){
+        throw new RuntimeException('Unsupported storage API operation.');
+    }
     $svc=service($service); $result=null;
     if($_SERVER['REQUEST_METHOD']==='GET'){
         $allowed=['stats','incidents','healthRecords','obligations','audits','assets','issuances','users','logins','dashboard'];

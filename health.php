@@ -1,48 +1,36 @@
 <?php
 declare(strict_types=1);
 
-/**
- * Deployment liveness endpoint.
- *
- * HostForge verifies that the container is serving HTTP by requesting this
- * file. Therefore this endpoint must not depend on MySQL or optional PHP
- * extensions. Dependency state is returned for diagnostics only.
- */
+// Basic web health remains independent of MySQL so a database outage does not
+// make the container look dead to the platform. Add ?db=1 to verify MySQL.
+$checkDb = isset($_GET['db']) && $_GET['db'] === '1';
+$dbStatus = null;
+$dbError = null;
+
+if ($checkDb) {
+    try {
+        require_once __DIR__.'/includes/db.php';
+        $pdo = db();
+        $pdo->query('SELECT 1')->fetchColumn();
+        $dbStatus = 'ok';
+    } catch (Throwable $e) {
+        $dbStatus = 'error';
+        $dbError = APP_DEBUG ? $e->getMessage() : 'Database connection failed';
+    }
+}
+
+http_response_code(($checkDb && $dbStatus !== 'ok') ? 503 : 200);
 header('Content-Type: application/json; charset=UTF-8');
 header('Cache-Control: no-cache, no-store, must-revalidate');
 
-$checks = [
-    'php' => PHP_VERSION,
-    'pdo' => extension_loaded('pdo'),
-    'pdo_mysql' => extension_loaded('pdo_mysql'),
-    'curl' => extension_loaded('curl'),
-    'mbstring' => extension_loaded('mbstring'),
-    'openssl' => extension_loaded('openssl'),
+$response = [
+    'status'    => ($checkDb && $dbStatus !== 'ok') ? 'degraded' : 'ok',
+    'app'       => 'Great Solomon Manpower Services Inc. Core Transaction 4',
+    'timestamp' => date('c'),
 ];
-
-$dbOk = false;
-try {
-    if ($checks['pdo'] && $checks['pdo_mysql']) {
-        require_once __DIR__.'/includes/db.php';
-        db()->query('SELECT 1');
-        $dbOk = true;
-    }
-} catch (Throwable $e) {
-    // Never expose connection details and never fail the HTTP liveness probe.
-    $dbOk = false;
+if ($checkDb) {
+    $response['database'] = $dbStatus;
+    if ($dbError !== null) $response['database_error'] = $dbError;
 }
 
-$checks['database'] = $dbOk;
-
-// HTTP 200 means Apache + PHP are alive and able to execute this endpoint.
-// Optional dependencies are reported above without blocking deployment.
-http_response_code(200);
-
-echo json_encode([
-    'status' => ($dbOk && $checks['pdo_mysql'] && $checks['curl'] && $checks['mbstring'] && $checks['openssl'])
-        ? 'ok'
-        : 'degraded',
-    'app' => 'Great Solomon Manpower Services Inc. Core Transaction 4',
-    'checks' => $checks,
-    'timestamp' => date('c'),
-], JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
+echo json_encode($response, JSON_UNESCAPED_SLASHES);

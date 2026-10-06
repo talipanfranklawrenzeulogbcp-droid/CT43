@@ -3,7 +3,7 @@ require_once __DIR__.'/../../includes/helpers.php';
 require_once __DIR__.'/../../includes/service_client.php';
 require_admin();
 $svc=service('admin');
-if($_SERVER['REQUEST_METHOD']==='POST'){
+if($_SERVER['REQUEST_METHOD']==='POST'){ verify_csrf();
     try { $message=$svc->handle((string)($_POST['action']??''),$_POST,current_user()); flash('success',$message); }
     catch(Throwable $e){ flash('error','Unable to save: '.$e->getMessage()); }
     redirect('/modules/system_admin_security/index.php');
@@ -28,14 +28,14 @@ page_header('System Administration & Security','security');show_flash();?>
 </section>
 
 <section class="record-form" id="create-user"><div class="gw-panel-head"><h2>Create User</h2><span>Secure password hash</span></div>
-<form method="post"><input type="hidden" name="action" value="add_user"><div class="form-grid">
+<form method="post"><?=csrf_field()?><input type="hidden" name="action" value="add_user"><div class="form-grid">
 <div><label>Name</label><input name="name" required></div><div><label>Email</label><input type="email" name="email" required></div>
 <div><label>Password</label><input type="password" name="password" required minlength="6"></div><div><label>Role</label><select name="role"><option>Administrator</option><option>Staff</option></select></div>
 </div><div class="record-actions"><button class="gw-btn primary">Create User</button></div></form></section>
 
 <section class="gw-panel" id="user-accounts"><div class="gw-panel-head"><h2>User Accounts</h2><span><?=count($users)?> accounts</span></div>
 <div class="table-wrap"><table class="data-table"><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th></th></tr></thead><tbody>
-<?php foreach($users as $u):?><tr><td><?=e($u['name'])?></td><td><?=e($u['email'])?></td><td><?=e($u['role'])?></td><td><?=((int)$u['active']?'Active':'Inactive')?></td><td style="display:flex;gap:6px;align-items:center"><button type="button" class="gw-btn secondary" onclick='showEditUserModal(<?=json_encode((int)$u['id'])?>,<?=json_encode($u['name'])?>,<?=json_encode($u['email'])?>,<?=json_encode($u['role'])?>)'>Edit</button><form method="post"><input type="hidden" name="action" value="set_user_status"><input type="hidden" name="id" value="<?=$u['id']?>"><input type="hidden" name="active" value="<?=((int)$u['active']?0:1)?>"><button class="gw-btn <?=((int)$u['active']?'btn-danger':'primary')?>" <?=((int)$u['id']===(int)current_user()['id'] && (int)$u['active']===1)?'disabled title="Current signed-in account cannot be deactivated"':''?>><?=((int)$u['active']?'Deactivate':'Activate')?></button></form></td></tr><?php endforeach;?>
+<?php foreach($users as $u):?><tr><td><?=e($u['name'])?></td><td><?=e($u['email'])?></td><td><?=e($u['role'])?></td><td><?=((int)$u['active']?'Active':'Inactive')?></td><td style="display:flex;gap:6px;align-items:center"><button type="button" class="gw-btn secondary" onclick='showEditUserModal(<?=json_encode((int)$u['id'])?>,<?=json_encode($u['name'])?>,<?=json_encode($u['email'])?>,<?=json_encode($u['role'])?>)'>Edit</button><form method="post"><?=csrf_field()?><input type="hidden" name="action" value="set_user_status"><input type="hidden" name="id" value="<?=$u['id']?>"><input type="hidden" name="active" value="<?=((int)$u['active']?0:1)?>"><button class="gw-btn <?=((int)$u['active']?'btn-danger':'primary')?>" <?=((int)$u['id']===(int)current_user()['id'] && (int)$u['active']===1)?'disabled title="Current signed-in account cannot be deactivated"':''?>><?=((int)$u['active']?'Deactivate':'Activate')?></button></form></td></tr><?php endforeach;?>
 </tbody></table></div></section>
 
 <section class="gw-panel" id="login-history" style="margin-top:20px">

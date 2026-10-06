@@ -5,9 +5,9 @@ require_once __DIR__.'/../includes/helpers.php';
 $reg=$_SESSION['pending_registration_user']??null;
 $login=$_SESSION['pending_biometric_user']??null;
 $enrollExisting=!empty($_SESSION['biometric_enroll_existing']);
-$isAdminSetup=$enrollExisting && strtolower((string)($user['email']??''))==='adminct4@gmail.com';
 if (!$reg && !$login) redirect('/auth/login.php');
 $user=$reg ?: $login;
+$isAdminSetup=$enrollExisting && strtolower((string)($user['email']??''))==='adminct4@gmail.com';
 $isRegistration=(bool)$reg;
 if ($isRegistration) {
     $created=(int)($_SESSION['pending_registration_created']??0);

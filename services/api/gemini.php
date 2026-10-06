@@ -2,7 +2,6 @@
 declare(strict_types=1);
 require_once __DIR__.'/../../includes/helpers.php';
 require_login();
-verify_csrf();
 require_once __DIR__.'/../../includes/config.php';
 
 header('Content-Type: application/json; charset=utf-8');
@@ -83,9 +82,7 @@ function ai_db_context(): string {
         if ($rows) {
             $parts[] = "Recent audit activity (metadata only):";
             foreach ($rows as $r) {
-                // Do not send audit details because they can contain names,
-                // email addresses, employee references, or other personal data.
-                $parts[] = "- ".($r['created_at']??'')." | ".($r['module']??'')." | ".($r['action']??'');
+                $parts[] = "- ".($r['created_at']??'')." | ".($r['module']??'')." | ".($r['action']??'')." | ".mb_substr((string)($r['details']??''),0,180);
             }
         }
     } catch (Throwable $e) {}
@@ -97,7 +94,7 @@ function ai_db_context(): string {
         }
     } catch (Throwable $e) {}
 
-    /* Never expose password hashes, biometric credential data, SMTP credentials, API keys, or session secrets. */
+    /* Never expose password hashes, OTP hashes, SMTP credentials, API keys, or session secrets. */
     return implode("\n", $parts);
 }
 
@@ -130,16 +127,7 @@ try {
         if (!is_array($item)) continue;
         $role = (($item['role'] ?? '') === 'model') ? 'model' : 'user';
         $text = trim((string)($item['text'] ?? ''));
-        if ($text === '') continue;
-
-        // Ignore malformed duplicate turns from stale browser sessionStorage.
-        $previousRole = $safeHistory ? $safeHistory[count($safeHistory) - 1]['role'] : null;
-        if ($previousRole !== null && $previousRole === $role) continue;
-
-        $safeHistory[] = [
-            'role' => $role,
-            'text' => mb_substr($text, 0, 3000)
-        ];
+        if ($text !== '') $safeHistory[] = ['role'=>$role,'text'=>mb_substr($text,0,3000)];
     }
 
     $systemInstruction = <<<TXT
@@ -148,39 +136,25 @@ You are an in-app support assistant, not a general unrestricted chatbot.
 Answer questions about the CT4 system, its modules, workflows, records, dashboards, security features, and the supplied system documentation.
 Use the live application context below as the source of truth for current counts and activity.
 Be concise, practical, and clear. If a fact is not present in the context, say you do not have enough information rather than inventing it.
-Do not reveal, reconstruct, guess, or output passwords, password hashes, biometric authentication data, SMTP credentials, API keys, session tokens, database credentials, or other secrets.
+Do not reveal, reconstruct, guess, or output passwords, password hashes, OTPs, SMTP credentials, API keys, session tokens, database credentials, or other secrets.
 Do not provide another user's private credentials or authentication data. You may explain security concepts and login history at an aggregate level.
 The logged-in user's identity and role are provided separately. Respect the user's role and do not claim permissions that are not established by the application.
 If asked to perform an action, explain the appropriate module/button and workflow; do not pretend that you performed a database change unless this endpoint actually performs it.
 TXT;
 
-    $context = "LOGGED-IN USER ROLE: ".($user['role']??'Staff')."\n\n";
+    $context = "LOGGED-IN USER: ".($user['name']??'User')." | ROLE: ".($user['role']??'Staff')." | EMAIL: ".($user['email']??'')."\n\n";
     $context .= ai_db_context()."\n\n".ai_file_context();
-
-    // The current question is always a fresh user turn. Drop a stale trailing
-    // user turn so the request cannot contain two consecutive user messages.
-    if ($safeHistory && $safeHistory[count($safeHistory) - 1]['role'] === 'user') {
-        array_pop($safeHistory);
-    }
 
     $contents = [];
     foreach ($safeHistory as $h) {
         $contents[] = ['role'=>$h['role'], 'parts'=>[['text'=>$h['text']]]];
     }
-    $contents[] = [
-        'role' => 'user',
-        'parts' => [['text' => "SYSTEM CONTEXT:
-".$context."
-
-USER QUESTION:
-".$message]]
-    ];
+    $contents[] = ['role'=>'user', 'parts'=>[['text'=>"SYSTEM CONTEXT:\n".$context."\n\nUSER QUESTION:\n".$message]]];
 
     /* Gemini can temporarily return 503 when a model is busy. Try the configured
        model first, then a small set of current stable Flash models. */
     $models = array_values(array_unique(array_filter([
         $model,
-        'gemini-3.8-flash',
         'gemini-3.7-flash',
         'gemini-3.6-flash',
         'gemini-3.5-flash'
@@ -281,10 +255,6 @@ USER QUESTION:
     audit('AI Assistant','Gemini Chat','Asked about system information');
     echo json_encode(['ok'=>true,'answer'=>$answer,'model'=>$usedModel]);
 } catch (Throwable $e) {
-    error_log('CT4 Gemini endpoint failure: '.$e->getMessage());
     http_response_code(500);
-    echo json_encode([
-        'ok'=>false,
-        'error'=>'The AI assistant encountered a server error. Please try again.'
-    ]);
+    echo json_encode(['ok'=>false,'error'=>$e->getMessage()]);
 }

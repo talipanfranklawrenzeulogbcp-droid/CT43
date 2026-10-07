@@ -148,3 +148,48 @@ Administrators can reply to employee feedback and delete an entire feedback conv
 the feedback inbox. Replies create a conversation message, notify the employee, and update the
 thread status to `Replied`. Deletion removes the thread, cascades its messages, and removes
 notifications associated with that thread. No database schema changes are required.
+
+## OTP / Gmail SMTP deployment
+
+The OTP flow stores the hashed verification code in `otp_requests` **before** attempting email delivery. If SMTP delivery fails, the stored code remains available and the user can use **Resend verification code**.
+
+For Gmail, configure the deployment environment with:
+
+- `GSMS_MAIL_HOST=smtp.gmail.com`
+- `GSMS_MAIL_PORT=587` (STARTTLS) or `465` (implicit TLS)
+- `GSMS_MAIL_USERNAME=your-sender@gmail.com`
+- `GSMS_MAIL_PASSWORD=<16-character Google App Password>`
+- `GSMS_MAIL_FROM_EMAIL=your-sender@gmail.com`
+- `GSMS_OTP_SENDER_EMAIL=your-sender@gmail.com`
+
+`GSMS_MAIL_PASSWORD` must be a Google App Password when using Gmail SMTP; do not put the normal Gmail account password in the deployment. The Administrator-only `auth/otp_diagnostic.php` endpoint can verify SMTP configuration and authentication without exposing the password.
+
+## OTP delivery troubleshooting (updated)
+
+The OTP is generated with `random_int()`, hashed with `password_hash()`, and stored in `otp_requests` before email delivery. The pending login session is also created before delivery so a transient SMTP failure does not trap the user on the password page; the user can use **Resend verification code** without losing the stored OTP workflow.
+
+The mailer now prefers PHP cURL SMTP (libcurl) and falls back to the existing TLS socket SMTP transport. The Docker image installs PHP cURL/OpenSSL. For Gmail, use a Google App Password; a normal Gmail account password will not authenticate to Gmail SMTP.
+
+Required production variables:
+
+- `GSMS_MAIL_HOST=smtp.gmail.com`
+- `GSMS_MAIL_PORT=587` (STARTTLS) or `465` (TLS)
+- `GSMS_MAIL_USERNAME=your-sender@gmail.com`
+- `GSMS_MAIL_PASSWORD=<16-character Google App Password>`
+- `GSMS_MAIL_FROM_EMAIL=your-sender@gmail.com`
+- `GSMS_OTP_SENDER_EMAIL=your-sender@gmail.com`
+- `GSMS_MAIL_TRANSPORT=auto`
+
+For Docker secrets, set `GSMS_MAIL_PASSWORD_FILE=/run/secrets/gsms_mail_password` instead of putting the password in an environment variable.
+
+After deployment, an Administrator can open `auth/otp_diagnostic.php` while signed in to check whether the SMTP username/password are present and whether Gmail SMTP authentication succeeds. The diagnostic never returns the password or OTP.
+
+If the diagnostic reports that the SMTP password is missing, this is a deployment configuration issue: the application cannot create a Gmail App Password itself. Add the App Password to the deployment secret/environment and restart/redeploy the container.
+
+## Feedback and archive workflow (updated)
+
+- Feedback is removed from the dashboard.
+- Staff access **Feedback** from the user dropdown and may only **Send** or **Unsend** their own feedback.
+- Administrators access **Employee Feedback** from the user dropdown and may view or delete employee feedback. Administrator replies are disabled.
+- Deleting/unsending feedback first creates an `archive_items` entry with `item_type='feedback'` containing the complete thread, messages, and related feedback notifications, then removes the active records.
+- The Administrator Archive interface separates Employee Feedback from other archived data and supports recovery, permanent deletion, and JSON backup of all archive data or feedback only.

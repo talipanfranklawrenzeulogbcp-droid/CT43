@@ -95,13 +95,6 @@ final class HealthSafetyService {
             $s=$this->pdo->prepare('UPDATE health_followups SET status=?,completed_at=? WHERE id=?');$s->execute([$status,$status==='Completed'?date('Y-m-d H:i:s'):null,$id]);
             $this->audit->record($user,self::MODULE,'Update Health Follow-up','ID '.$id);return 'Health follow-up updated.';
         }
-        if($action==='update_incident_action'){
-            $id=(int)($data['id']??0); $status=(string)($data['status']??'');
-            if($id<=0 || !in_array($status,['Open','In Progress','Completed','Cancelled'],true)) throw new RuntimeException('Invalid incident action update.');
-            $s=$this->pdo->prepare('UPDATE incident_actions SET status=?,completed_at=? WHERE id=?');
-            $s->execute([$status,$status==='Completed'?date('Y-m-d H:i:s'):null,$id]);
-            $this->audit->record($user,self::MODULE,'Update Incident Action','ID '.$id); return 'Incident action updated.';
-        }
         if($action==='add_incident_action'){
             $incident=(int)($data['incident_id']??0);$text=trim((string)($data['action_text']??''));if($incident<=0||$text==='')throw new RuntimeException('Incident and action are required.');
             $type=(string)($data['action_type']??'Corrective');$status=(string)($data['status']??'Open');

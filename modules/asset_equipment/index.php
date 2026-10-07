@@ -116,7 +116,7 @@ page_header('Asset & Equipment Issuance','assets');show_flash();?>
       <div><label>Expected Return</label><input type="date" name="expected_return"></div>
       <div class="full"><label>Notes / Purpose</label><textarea name="notes" placeholder="Purpose or condition details..."></textarea></div>
     </div>
-    <div class="record-actions"><button type="submit" class="gw-btn primary">Issue Equipment</button></div>
+    <div class="record-actions"><button class="gw-btn primary">Issue Equipment</button></div>
   </form>
 </section>
 
@@ -137,7 +137,7 @@ page_header('Asset & Equipment Issuance','assets');show_flash();?>
       <div><label>Asset Picture</label><input type="file" name="asset_image" accept="image/jpeg,image/png,image/webp,image/gif"><small style="display:block;color:#64748b;margin-top:5px">Optional. JPG, PNG, WEBP or GIF, up to 5 MB.</small></div>
     </div>
     <div class="record-actions">
-      <button type="submit" class="gw-btn secondary">Register Item</button>
+      <button class="gw-btn secondary">Register Item</button>
     </div>
   </form>
 </section>
@@ -184,7 +184,7 @@ function showAssetPicture(assetId, assetName) {
   const root = document.getElementById('modalRoot');
   if (!root) return;
   const src = <?=json_encode(url('/modules/asset_equipment/asset_image.php'))?> + '?id=' + encodeURIComponent(String(assetId));
-  root.innerHTML = `<div class="gw-modal-backdrop" onclick="if(event.target===this)closeModal()"><div class="gw-modal" style="width:min(900px,100%)"><div class="gw-modal-head"><div><strong>${escapeHtml(assetName || 'Asset Picture')}</strong><small>Asset / equipment picture</small></div><button type="button" class="gw-modal-close" onclick="closeModal()" aria-label="Close">×</button></div><div class="gw-modal-body" style="text-align:center"><img src="${src}" alt="${escapeHtml(assetName || 'Asset Picture')}" style="max-width:100%;max-height:70vh;object-fit:contain;border-radius:12px"></div></div></div>`;
+  root.innerHTML = `<div class="gw-modal-backdrop" onclick="if(event.target===this)closeModal()"><div class="gw-modal" style="width:min(900px,100%)"><div class="gw-modal-head"><div><strong>${escapeHtml(assetName || 'Asset Picture')}</strong><small>Asset / equipment picture</small></div><button class="gw-modal-close" onclick="closeModal()" aria-label="Close">×</button></div><div class="gw-modal-body" style="text-align:center"><img src="${src}" alt="${escapeHtml(assetName || 'Asset Picture')}" style="max-width:100%;max-height:70vh;object-fit:contain;border-radius:12px"></div></div></div>`;
 }
 
 function selectAssetToBorrow(assetId) {

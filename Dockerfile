@@ -64,7 +64,7 @@ RUN mkdir -p storage/logs storage/exports storage/reports \
 
 EXPOSE 8080
 
-HEALTHCHECK --interval=15s --timeout=3s --start-period=5s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=5 \
     CMD php -r '$p=(int)(getenv("PORT")?:8080); $c=@file_get_contents("http://127.0.0.1:".$p."/health.php"); if($c===false) exit(1); $j=json_decode($c,true); exit(($j["status"]??"") === "ok" ? 0 : 1);'
 
 ENV PORT=8080

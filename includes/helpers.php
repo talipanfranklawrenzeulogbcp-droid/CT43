@@ -276,7 +276,7 @@ $staffNotifications = (($u['role'] ?? '') === 'Staff') ? staff_transfer_notifica
 </button>
 <div id="userMenu" class="user-dropdown">
 <button type="button" onclick="showDataStorageModal()"><span class="material-symbols-outlined">folder_data</span>Data Storage</button><button type="button" onclick="showArchiveModal()"><span class="material-symbols-outlined">archive</span>Archive</button>
-<?php if (($u['role'] ?? '') === 'Staff'): ?><button type="button" onclick="showFeedbackModal()"><span class="material-symbols-outlined">feedback</span>Feedback</button><?php endif; ?>
+<?php if (($u['role'] ?? '') === 'Administrator'): ?><button type="button" onclick="showAdminFeedbackModal()"><span class="material-symbols-outlined">feedback</span>Employee Feedback</button><?php elseif (($u['role'] ?? '') === 'Staff'): ?><button type="button" onclick="showFeedbackModal()"><span class="material-symbols-outlined">feedback</span>Feedback</button><?php endif; ?>
 <button type="button" onclick="showTermsModal()"><span class="material-symbols-outlined">gavel</span>Terms and Conditions</button>
 <button type="button" onclick="showLogoutModal()"><span class="material-symbols-outlined">logout</span>Logout</button>
 </div>

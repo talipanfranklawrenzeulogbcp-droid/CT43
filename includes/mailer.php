@@ -47,10 +47,13 @@ function smtp_cmd($socket, string $command, array $codes): string {
 
 function smtp_connect_and_auth() {
     if (trim(MAIL_USERNAME) === '' || trim(MAIL_PASSWORD) === '') {
-        throw new RuntimeException('Gmail SMTP username or App Password is not configured.');
+        throw new RuntimeException('Gmail SMTP username or App Password is not configured. Set GSMS_MAIL_USERNAME and GSMS_MAIL_PASSWORD (a Gmail App Password).');
     }
 
     $context = stream_context_create([
+        'socket' => [
+            'tcp_nodelay' => true,
+        ],
         'ssl' => [
             'verify_peer' => true,
             'verify_peer_name' => true,
@@ -107,6 +110,7 @@ function smtp_connect_and_auth() {
             // it is supported by both Gmail SMTP and common managed hosts, then
             // fall back to PLAIN when LOGIN is not advertised.
             $authCaps = strtoupper($ehlo);
+            $authCaps = preg_replace('/\s+/', ' ', $authCaps) ?? $authCaps;
             if (strpos($authCaps, 'AUTH LOGIN') !== false) {
                 smtp_cmd($socket, 'AUTH LOGIN', [334]);
                 smtp_cmd($socket, base64_encode(MAIL_USERNAME), [334]);
@@ -134,7 +138,9 @@ function smtp_connect_and_auth() {
             $message = strtolower($lastError);
             $authFailure = str_contains($message, 'smtp error 535')
                 || str_contains($message, 'authentication')
-                || str_contains($message, 'auth ');
+                || str_contains($message, 'auth ')
+                || str_contains($message, '5.7.8')
+                || str_contains($message, 'invalid credentials');
             if ($authFailure) break;
             continue;
         }
@@ -163,6 +169,99 @@ function native_mail_send(string $recipient, string $subject, string $htmlBody):
     return @mail($recipient, $safeSubject, $htmlBody, $headers);
 }
 
+function smtp_message_payload(string $recipient, string $subject, string $htmlBody): array {
+    $from = OTP_SENDER_EMAIL ?: MAIL_FROM_EMAIL;
+    $safeSubject = '=?UTF-8?B?'.base64_encode($subject).'?=';
+    $headers = [
+        'Date: '.date(DATE_RFC2822),
+        'From: '.MAIL_FROM_NAME.' <'.$from.'>',
+        'To: <'.$recipient.'>',
+        'Subject: '.$safeSubject,
+        'MIME-Version: 1.0',
+        'Content-Type: text/html; charset=UTF-8',
+        'Content-Transfer-Encoding: 8bit',
+        'X-Mailer: Great Solomon Manpower Services Inc. Core Transaction 4'
+    ];
+    $body = str_replace(["\r\n", "\r"], "\n", $htmlBody);
+    $body = preg_replace('/(^|\n)\./', '$1..', $body) ?? $body;
+    $body = str_replace("\n", "\r\n", $body);
+    $message = implode("\r\n", $headers)."\r\n\r\n".$body;
+    return [$from, $message];
+}
+
+/**
+ * SMTP through libcurl. The Docker image installs PHP cURL and libcurl with
+ * TLS support. This avoids several edge cases of manually implementing SMTP
+ * authentication/STARTTLS while retaining the socket transport below as a
+ * fallback for hosts where cURL SMTP is unavailable.
+ */
+function smtp_send_via_curl(string $recipient, string $subject, string $htmlBody): void {
+    if (!function_exists('curl_init')) {
+        throw new RuntimeException('PHP cURL SMTP transport is unavailable.');
+    }
+    $protocols = function_exists('curl_version') ? (curl_version()['protocols'] ?? []) : [];
+    if (!in_array('smtp', $protocols, true) && !in_array('smtps', $protocols, true)) {
+        throw new RuntimeException('This PHP cURL build does not support SMTP.');
+    }
+
+    [$from, $message] = smtp_message_payload($recipient, $subject, $htmlBody);
+    $port = (int)MAIL_PORT;
+    if (!in_array($port, [465, 587], true)) {
+        throw new RuntimeException('Gmail SMTP requires port 587 (STARTTLS) or 465 (TLS).');
+    }
+
+    $scheme = $port === 465 ? 'smtps' : 'smtp';
+    $url = $scheme.'://'.MAIL_HOST.':'.$port;
+    $stream = fopen('php://temp', 'r+');
+    if ($stream === false) throw new RuntimeException('Unable to prepare SMTP message stream.');
+    // cURL terminates the SMTP DATA block itself; do not append the SMTP dot terminator.
+    fwrite($stream, $message."\r\n");
+    rewind($stream);
+
+    $ch = curl_init($url);
+    if ($ch === false) {
+        fclose($stream);
+        throw new RuntimeException('Unable to initialize the SMTP transport.');
+    }
+
+    curl_setopt_array($ch, [
+        CURLOPT_USERNAME        => MAIL_USERNAME,
+        CURLOPT_PASSWORD        => MAIL_PASSWORD,
+        CURLOPT_MAIL_FROM       => $from,
+        CURLOPT_MAIL_RCPT       => [$recipient],
+        CURLOPT_UPLOAD          => true,
+        CURLOPT_READDATA        => $stream,
+        CURLOPT_CONNECTTIMEOUT  => MAIL_SMTP_TIMEOUT_SECONDS,
+        CURLOPT_TIMEOUT         => MAIL_SMTP_TIMEOUT_SECONDS + 10,
+        CURLOPT_RETURNTRANSFER  => true,
+        CURLOPT_SSL_VERIFYPEER  => true,
+        CURLOPT_SSL_VERIFYHOST  => 2,
+        CURLOPT_USERAGENT       => 'Great Solomon CT4 OTP Mailer',
+    ]);
+    if ($port === 587) {
+        curl_setopt($ch, CURLOPT_USE_SSL, CURLUSESSL_ALL);
+    }
+
+    $result = curl_exec($ch);
+    $errno = curl_errno($ch);
+    $error = curl_error($ch);
+    $info = curl_getinfo($ch);
+    curl_close($ch);
+    fclose($stream);
+
+    if ($result === false || $errno !== 0) {
+        $detail = $error !== '' ? $error : ('cURL SMTP error '.$errno);
+        throw new RuntimeException($detail);
+    }
+    $responseCode = (int)($info['http_code'] ?? 0);
+    // SMTP does not use HTTP status codes; successful curl SMTP transfers
+    // normally expose a zero HTTP code. A non-zero HTTP code here is a proxy
+    // response and should be treated as an error.
+    if ($responseCode >= 400) {
+        throw new RuntimeException('SMTP transport proxy returned HTTP '.$responseCode.'.');
+    }
+}
+
 function smtp_send_message(string $recipient, string $subject, string $htmlBody): void {
     if (!filter_var($recipient, FILTER_VALIDATE_EMAIL)) {
         throw new RuntimeException('The recipient email address is invalid.');
@@ -171,7 +270,18 @@ function smtp_send_message(string $recipient, string $subject, string $htmlBody)
         throw new RuntimeException('The configured sender email address is invalid.');
     }
     if (trim(MAIL_USERNAME) === '' || trim(MAIL_PASSWORD) === '') {
-        throw new RuntimeException('Gmail SMTP username or App Password is not configured.');
+        throw new RuntimeException('Gmail SMTP username or App Password is not configured. Set GSMS_MAIL_USERNAME and GSMS_MAIL_PASSWORD (or GSMS_MAIL_PASSWORD_FILE for a Docker secret).');
+    }
+
+    $transport = MAIL_SMTP_TRANSPORT;
+    if ($transport === 'curl' || $transport === 'auto') {
+        try {
+            smtp_send_via_curl($recipient, $subject, $htmlBody);
+            return;
+        } catch (Throwable $curlError) {
+            otp_mail_log('cURL SMTP transport failed: '.$curlError->getMessage());
+            if ($transport === 'curl') throw $curlError;
+        }
     }
 
     $socket = smtp_connect_and_auth();

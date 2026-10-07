@@ -33,11 +33,3 @@ Feedback: notification -> conversation -> reply/status -> delete/archive accordi
 Asset: register -> available stock -> issue/borrow -> return/status update.
 Safety: report -> investigate/update -> corrective/preventive action -> complete/close.
 Compliance: create requirement/report -> update evidence/status -> action item -> complete -> audit.
-
-
-## Final UI and cleanup pass (2026-10-07)
-- Redesigned the login Terms & Conditions panel with section cards, legal-reference tags, protected-access badge, and responsive acceptance area.
-- Preserved the existing Terms acceptance gate (`terms_accepted=1`) and OTP/login workflow.
-- Removed legacy backup artifacts and unreferenced feedback/notification helper endpoints from earlier merge iterations.
-- No database tables or records were removed.
-- PHP syntax and JavaScript syntax revalidated after the changes.

@@ -6,7 +6,7 @@ Preserved from FIRST ZIP:
 - Original UI/presentation: style.css, dashboard.php, app.js, logo
 - Original one-time feedback workflow: includes/feedback.php
 - Existing .env/.env.example
-- Existing database/database.sql remains the base database
+- Existing database/database.sql and database/database.sql.bak as the base database
 
 Replaced/updated from SECOND ZIP:
 - Authentication/OTP and shared backend workflow code

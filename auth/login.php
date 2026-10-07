@@ -241,16 +241,62 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
         <div class="field"><label>Password</label><input type="password" name="password" autocomplete="current-password" required></div>
 
         <details class="auth-terms" id="loginTerms">
-          <summary><span>Terms and Conditions</span><span class="material-symbols-outlined" aria-hidden="true">expand_more</span></summary>
+          <summary>
+            <span class="auth-terms-summary">
+              <span class="auth-terms-icon"><span class="material-symbols-outlined">gavel</span></span>
+              <span>
+                <strong>Terms and Conditions</strong>
+                <small>System use, privacy, security and compliance</small>
+              </span>
+            </span>
+            <span class="material-symbols-outlined auth-terms-chevron" aria-hidden="true">expand_more</span>
+          </summary>
           <div class="auth-terms-body">
-            <p>By accessing and using this system, you acknowledge that it is intended only for authorized Great Solomon Manpower Services Inc. administrators and staff. Use your assigned account appropriately, keep authentication information confidential, and ensure records you create or update are accurate and used only for legitimate company purposes.</p>
-            <p>The system may process personal and sensitive personal information. Such information must be handled only as authorized for your work responsibilities and in accordance with applicable company policies and Philippine data-protection requirements.</p>
-            <p>Unauthorized access, account sharing, bypassing security controls, misuse of records, disruption, malicious code, or other prohibited activity is not permitted. System activity may be logged for legitimate security, audit, operational, and compliance purposes.</p>
-            <p>Health, safety, welfare, recruitment, employment, and legal-compliance records must be used only for authorized business purposes. Applicable laws and regulations prevail where these terms conflict with a legal requirement.</p>
+            <div class="auth-terms-intro">
+              <div>
+                <span class="auth-terms-kicker">CORE TRANSACTION 4</span>
+                <h2>Responsible System Use</h2>
+                <p>Please review these rules before signing in. They apply to authorized Great Solomon Manpower Services Inc. administrators and staff.</p>
+              </div>
+              <span class="auth-terms-badge"><span class="material-symbols-outlined">verified_user</span>Protected access</span>
+            </div>
+
+            <div class="auth-terms-grid">
+              <article class="auth-term-card">
+                <span class="material-symbols-outlined">manage_accounts</span>
+                <div><strong>1. Authorized Access</strong><p>Use only your assigned account. Keep passwords and verification information confidential. Account sharing, bypassing access controls, or accessing another user's account is prohibited.</p></div>
+              </article>
+              <article class="auth-term-card">
+                <span class="material-symbols-outlined">privacy_tip</span>
+                <div><strong>2. Privacy &amp; Records</strong><p>Personal and sensitive personal information must be handled only for authorized work purposes and in accordance with company policies and applicable Philippine data-protection requirements.</p></div>
+              </article>
+              <article class="auth-term-card">
+                <span class="material-symbols-outlined">security</span>
+                <div><strong>3. Security &amp; Monitoring</strong><p>Do not introduce malicious code, disrupt services, alter or delete records without authorization, or attempt to defeat security controls. Legitimate system, audit and security activity may be logged.</p></div>
+              </article>
+              <article class="auth-term-card">
+                <span class="material-symbols-outlined">fact_check</span>
+                <div><strong>4. Accurate Business Records</strong><p>Health, safety, welfare, recruitment, employment and legal-compliance information must be accurate, relevant and used only for legitimate company purposes.</p></div>
+              </article>
+            </div>
+
+            <div class="auth-terms-legal">
+              <div class="auth-terms-legal-head">
+                <span class="material-symbols-outlined">balance</span>
+                <div><strong>Applicable requirements</strong><small>These terms do not replace applicable laws or company policies.</small></div>
+              </div>
+              <div class="auth-terms-legal-tags">
+                <span>Data Privacy Act of 2012 · RA 10173</span>
+                <span>Cybercrime Prevention Act · RA 10175</span>
+                <span>Occupational Safety &amp; Health · RA 11058</span>
+              </div>
+              <p>Where these terms conflict with a legal requirement, the applicable law or regulation prevails. Users should report privacy, security, safety or data-quality concerns to the appropriate administrator.</p>
+            </div>
+
             <div class="auth-terms-accept">
               <label class="auth-checkbox">
                 <input type="checkbox" id="termsCheckbox" required>
-                <span>I have read and agree to the Terms and Conditions.</span>
+                <span><strong>I have read and agree to the Terms and Conditions.</strong><small>I understand that access is limited to authorized business use.</small></span>
               </label>
               <button type="button" class="gw-btn secondary auth-terms-confirm" id="confirmTerms" disabled>
                 <span class="material-symbols-outlined">check_circle</span> Confirm Terms
